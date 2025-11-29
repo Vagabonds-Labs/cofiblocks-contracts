@@ -1,0 +1,40 @@
+[package]
+name = "contracts"
+edition = "2023_11"
+version = "0.3.0"
+
+# See more keys and their definitions at https://docs.swmansion.com/scarb/docs/reference/manifest.html
+
+[dependencies]
+openzeppelin = "1.0.0"
+ekubo = { git = "https://github.com/EkuboProtocol/abis", rev = "edb6de8c9baf515f1053bbab3d86825d54a63bc3" }
+starknet = "2.11.4"
+
+[dev-dependencies]
+snforge_std = "0.44.0"
+assert_macros = "2.11.4"
+
+[scripts]
+test = "snforge test"
+
+[[target.starknet-contract]]
+casm = true
+sierra = true
+
+[[tool.snforge.fork]]
+name = "MAINNET_LATEST"
+# Note: Blast API is deprecated. Using Cartridge public RPC endpoint.
+# For Cartridge public endpoint: https://api.cartridge.gg/x/starknet/mainnet
+url = "https://api.cartridge.gg/x/starknet/mainnet"
+block_id.tag = "latest"
+
+[tool.fmt]
+sort-module-level-items = true
+
+[tool.scarb]
+allow-prebuilt-plugins = ["snforge_std"]
+
+[profile.dev.cairo]
+unstable-add-statements-code-locations-debug-info = true
+unstable-add-statements-functions-debug-info = true
+panic-backtrace = true
