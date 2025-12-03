@@ -136,6 +136,11 @@ let deployCalls = [];
 
 const { provider, deployer, feeToken }: Network = networks[networkName];
 
+// NUEVA FUNCIÓN PARA AGREGAR MANUALMENTE ENTRADAS
+export const registerDeployment = (contractName: string, data: any) => {
+    deployments[contractName] = data;
+};
+
 const declareIfNot_NotWait = async (
 	payload: DeclareContractPayload,
 	options?: UniversalDetails,
@@ -405,6 +410,29 @@ const deployContract = async (
 		classHash: classHash,
 		address: contractAddress,
 	};
+};
+
+export const declareOnly = async (contractName: string, options?: UniversalDetails) => {
+	const compiledContractCasm = JSON.parse(
+		fs.readFileSync(findContractFile(contractName, "compiled_contract_class")).toString("ascii")
+	);
+
+	const compiledContractSierra = JSON.parse(
+		fs.readFileSync(findContractFile(contractName, "contract_class")).toString("ascii")
+	);
+
+	console.log(yellow(`Declaring class for upgrade: ${contractName}`));
+
+	const payload = {
+		contract: compiledContractSierra,
+		casm: compiledContractCasm,
+	};
+
+	// Simply call declare (NO constructor, NO deployment)
+	const { classHash } = await declareIfNot_NotWait(payload, options);
+
+	console.log(green(`✔ Declared classHash for ${contractName}: ${classHash}`));
+	return classHash;
 };
 
 const executeDeployCalls = async (options?: UniversalDetails) => {

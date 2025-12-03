@@ -38,7 +38,8 @@ mod Distribution {
     use openzeppelin::introspection::src5::SRC5Component;
     use openzeppelin::token::erc1155::erc1155_receiver::ERC1155ReceiverComponent;
     use openzeppelin::upgrades::UpgradeableComponent;
-    use starknet::ContractAddress;
+    use openzeppelin::upgrades::interface::IUpgradeable;
+    use starknet::{ClassHash, ContractAddress};
     use starknet::storage::{
         Map, MutableVecTrait, StoragePointerReadAccess, StoragePointerWriteAccess, Vec,
     };
@@ -288,6 +289,16 @@ mod Distribution {
             // Reset the state
             self.total_purchases.write(0);
             self.total_profit.write(0);
+        }
+    }
+
+    #[abi(embed_v0)]
+    impl UpgradeableImpl of IUpgradeable<ContractState> {
+        fn upgrade(ref self: ContractState, new_class_hash: ClassHash) {
+            // This function can only be called by the owner
+            self.accesscontrol.assert_only_role(DEFAULT_ADMIN_ROLE);
+            // Replace the class hash upgrading the contract
+            self.upgradeable.upgrade(new_class_hash);
         }
     }
 

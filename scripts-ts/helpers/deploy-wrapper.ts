@@ -8,6 +8,7 @@ interface CommandLineOptions {
 	$0: string; // The script name or path is under the `$0` key
 	network?: string; // The --network option
 	reset?: boolean;
+	upgrade?: boolean;
 }
 
 function main() {
@@ -30,6 +31,11 @@ function main() {
 			description: "Do not reset deployments (keep existing deployments)",
 			default: false,
 		})
+		.option("upgrade", {
+			type: "boolean",
+			description: "Upgrade contracts (Distribution + Marketplace)",
+			default: false,
+		})
 		.demandOption(["network"])
 		.strict() // This will make yargs throw an error for unknown options
 		.help()
@@ -47,7 +53,7 @@ function main() {
 	try {
 		smartCompile();
 
-		const command = `ts-node scripts-ts/deploy.ts --network ${argv.network || "devnet"}${resetFlag ? ` ${resetFlag}` : ""} && ts-node scripts-ts/helpers/parse-deployments.ts`;
+		const command = `ts-node scripts-ts/deploy.ts --network ${argv.network || "devnet"}${resetFlag ? ` ${resetFlag}` : ""}${argv.upgrade ? ` --upgrade` : ""} && ts-node scripts-ts/helpers/parse-deployments.ts`;
 
 		execSync(command, { stdio: "inherit" });
 	} catch (error) {

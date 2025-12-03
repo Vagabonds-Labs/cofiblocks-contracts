@@ -1,81 +1,132 @@
 import { addAddressPadding, byteArray } from "starknet";
 import {
+	declareOnly,
 	deployContract,
 	deployer,
 	executeDeployCalls,
 	exportDeployments,
+	loadExistingDeployments,
+	registerDeployment,
+	provider,
 } from "./deploy-contract";
-import { green, yellow } from "./helpers/colorize-log";
+import { green, yellow, red } from "./helpers/colorize-log";
+import yargs from "yargs";
 
-/**
- * Deploy a contract using the specified parameters.
- *
- * @example (deploy contract with contructorArgs)
- * const deployScript = async (): Promise<void> => {
- *   await deployContract(
- *     {
- *       contract: "YourContract",
- *       contractName: "YourContractExportName",
- *       constructorArgs: {
- *         owner: deployer.address,
- *       },
- *       options: {
- *         maxFee: BigInt(1000000000000)
- *       }
- *     }
- *   );
- * };
- *
- * @example (deploy contract without contructorArgs)
- * const deployScript = async (): Promise<void> => {
- *   await deployContract(
- *     {
- *       contract: "YourContract",
- *       contractName: "YourContractExportName",
- *       options: {
- *         maxFee: BigInt(1000000000000)
- *       }
- *     }
- *   );
- * };
- *
- *
- * @returns {Promise<void>}
- */
+/** ------------------------------
+ *  ARGUMENT PARSING
+ *  ------------------------------ */
+const argv = yargs(process.argv.slice(2))
+	.option("network", {
+		type: "string",
+		required: true,
+	})
+	.option("upgrade", {
+		type: "boolean",
+		description: "Upgrade Distribution + Marketplace using latest deployments",
+	})
+	.parseSync();
 
+/** ------------------------------
+ *   Helper: string → Cairo ByteArray
+ *  ------------------------------ */
 const string_to_byte_array = (str: string): string[] => {
-	const byte_array = byteArray.byteArrayFromString(str);
-	const result = [`0x${byte_array.data.length.toString(16)}`];
-	for (let i = 0; i < byte_array.data.length; i++) {
-		result.push(byte_array.data[i].toString());
-	}
-	if (byte_array.pending_word) {
-		result.push(byte_array.pending_word.toString());
-	}
-	result.push(`0x${byte_array.pending_word_len.toString(16)}`);
+	const ba = byteArray.byteArrayFromString(str);
+	const result = [`0x${ba.data.length.toString(16)}`];
+
+	for (const v of ba.data) result.push(v.toString());
+	if (ba.pending_word) result.push(ba.pending_word.toString());
+
+	result.push(`0x${ba.pending_word_len.toString(16)}`);
 	return result;
 };
 
+/** ------------------------------
+ *   Upgrade helper (1 contract)
+ *  ------------------------------ */
+const upgradeOne = async (contractName: string, address: string) => {
+	console.log(yellow(`🔄 Upgrading ${contractName} at ${address}...`));
+
+	// Step 1 — just declare
+	const classHash = await declareOnly(contractName);
+
+	if (!classHash) throw new Error(red("❌ Could not declare new class"));
+
+	console.log(green(`✔ Declared new classHash: ${classHash}`));
+
+	// Step 2 — execute upgrade(class_hash)
+	const tx = await deployer.execute([
+		{
+			contractAddress: address,
+			entrypoint: "upgrade",
+			calldata: [classHash],
+		},
+	]);
+
+	console.log(green(`🔄 Upgrade TX for ${contractName}: ${tx.transaction_hash}`));
+	await provider.waitForTransaction(tx.transaction_hash);
+
+	console.log(green(`✨ Successfully upgraded ${contractName}`));
+	registerDeployment(contractName, {
+		contract: contractName,
+		address,
+		classHash
+	  });
+	  
+};
+
+/** ------------------------------
+ *   UPGRADE MODE
+ *  ------------------------------ */
+const upgradeMode = async () => {
+	console.log(yellow("🔄 Upgrade mode activated — no redeploys"));
+
+	const deployments = loadExistingDeployments();
+
+	const distribution = deployments["Distribution"];
+	const marketplace = deployments["Marketplace"];
+
+	if (!distribution || !marketplace) {
+		console.error(
+			red(
+				"❌ Cannot upgrade — missing Distribution or Marketplace in deployments/<network>_latest.json"
+			)
+		);
+		process.exit(1);
+	}
+
+	await upgradeOne("Distribution", distribution.address);
+	await upgradeOne("Marketplace", marketplace.address);
+
+	exportDeployments();
+	console.log(green("✔ All upgrades completed"));
+};
+
+
+/** ------------------------------
+ *   FULL DEPLOY MODE
+ *  ------------------------------ */
 const deployScript = async (): Promise<void> => {
-	console.log("🚀 Creating deployment calls...");
-	const admin_address = deployer.address;
+	const admin = deployer.address;
+
+	// If --upgrade is passed → skip deploy entirely
+	if (argv.upgrade) return upgradeMode();
+
+	console.log("🚀 Deploying full system...");
 
 	const { address: cofiCollectionAddress } = await deployContract({
 		contract: "CofiCollection",
 		constructorArgs: {
-			default_admin: admin_address,
-			pauser: admin_address,
-			minter: admin_address,
-			uri_setter: admin_address,
-			upgrader: admin_address,
+			default_admin: admin,
+			pauser: admin,
+			minter: admin,
+			uri_setter: admin,
+			upgrader: admin,
 		},
 	});
 
 	const { address: distributionAddress } = await deployContract({
 		contract: "Distribution",
-		constructorArgs: {
-			admin: admin_address,
-		},
+		constructorArgs: { admin },
 	});
 
 	const { address: marketplaceAddress } = await deployContract({
@@ -83,56 +134,43 @@ const deployScript = async (): Promise<void> => {
 		constructorArgs: {
 			cofi_collection_address: cofiCollectionAddress,
 			distribution_address: distributionAddress,
-			admin: admin_address,
-			market_fee: BigInt(5000), // 50 %
+			admin,
+			market_fee: BigInt(5000),
 		},
 	});
 
-	console.log(
-		"CofiCollection will be deployed at:",
-		green(cofiCollectionAddress),
-	);
-	console.log("Distribution will be deployed at:", green(distributionAddress));
-	console.log("Marketplace will be deployed at:", green(marketplaceAddress));
+	console.log("CofiCollection:", green(cofiCollectionAddress));
+	console.log("Distribution:", green(distributionAddress));
+	console.log("Marketplace:", green(marketplaceAddress));
+
 	await executeDeployCalls();
 
-	console.log("🚀 Performing initial configs...");
-	const base_uri_txt = process.env.TOKEN_METADATA_URL || "";
-	console.log("Base URI:", base_uri_txt);
-	const transactions = [
+	// Post-deploy setup
+	const base_uri = process.env.TOKEN_METADATA_URL || "";
+	const tx = await deployer.execute([
 		{
 			contractAddress: cofiCollectionAddress,
 			entrypoint: "set_minter",
-			calldata: {
-				minter: marketplaceAddress,
-			},
+			calldata: { minter: marketplaceAddress },
 		},
 		{
 			contractAddress: cofiCollectionAddress,
 			entrypoint: "set_base_uri",
-			calldata: string_to_byte_array(base_uri_txt),
+			calldata: string_to_byte_array(base_uri),
 		},
 		{
 			contractAddress: distributionAddress,
 			entrypoint: "set_marketplace",
-			calldata: {
-				marketplace: marketplaceAddress,
-			},
+			calldata: { marketplace: marketplaceAddress },
 		},
-	];
-	const { transaction_hash } = await deployer.execute(transactions);
-	console.log("🚀 Final transactions hash", transaction_hash);
-	console.log(
-		yellow(
-			"Make sure to update the contracts metadata in web app!! See README.md",
-		),
-	);
+	]);
+
+	console.log("🚀 Config TX", tx.transaction_hash);
 };
 
 deployScript()
-	.then(async () => {
+	.then(() => {
 		exportDeployments();
-
-		console.log(green("All Setup Done"));
+		console.log(green("✔ All setup done"));
 	})
 	.catch(console.error);

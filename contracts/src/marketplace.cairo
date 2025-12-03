@@ -52,6 +52,7 @@ pub trait IMarketplace<ContractState> {
     fn create_products(
         ref self: ContractState, initial_stock: Span<u256>, price: Span<u256>,
     ) -> Span<u256>;
+    fn add_stock(ref self: ContractState, token_id: u256, amount: u256, data: Span<felt252>);
     fn get_product_price(
         self: @ContractState, token_id: u256, token_amount: u256, payment_token: PAYMENT_TOKEN,
     ) -> u256;
@@ -67,6 +68,9 @@ pub trait IMarketplace<ContractState> {
     fn withdraw(ref self: ContractState, token: PAYMENT_TOKEN);
     fn claim_payment(ref self: ContractState);
     fn get_claim_payment(self: @ContractState, wallet_address: ContractAddress) -> u256;
+    fn get_current_stock(self: @ContractState, token_id: u256) -> u256;
+    fn get_current_price(self: @ContractState, token_id: u256) -> u256;
+    fn update_price(ref self: ContractState, token_id: u256, price: u256);
 }
 
 pub mod MainnetConfig {
@@ -104,9 +108,10 @@ mod Marketplace {
     use openzeppelin::token::erc1155::erc1155_receiver::ERC1155ReceiverComponent;
     use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
     use openzeppelin::upgrades::UpgradeableComponent;
+    use openzeppelin::upgrades::interface::IUpgradeable;
     use starknet::event::EventEmitter;
     use starknet::storage::Map;
-    use starknet::{ContractAddress, get_caller_address, get_contract_address};
+    use starknet::{ClassHash, ContractAddress, get_caller_address, get_contract_address};
     use super::{MainnetConfig, PAYMENT_TOKEN, SwapAfterLockParameters, SwapResult};
 
     component!(
@@ -199,6 +204,8 @@ mod Marketplace {
     struct CreateProduct {
         token_id: u256,
         initial_stock: u256,
+        owner: ContractAddress,
+        price: u256,
     }
 
     // Emitted when the stock of a product is updated
@@ -213,7 +220,7 @@ mod Marketplace {
     struct BuyProduct {
         token_id: u256,
         amount: u256,
-        price: u256,
+        buyer: ContractAddress,
     }
 
     // Emitted when a batch of products is bought from the Marketplace
@@ -221,7 +228,7 @@ mod Marketplace {
     struct BuyBatchProducts {
         token_ids: Span<u256>,
         token_amount: Span<u256>,
-        total_price: u256,
+        buyer: ContractAddress,
     }
 
     // Emitted when the seller gets their tokens from a sell
@@ -417,7 +424,7 @@ mod Marketplace {
             let new_stock = stock - token_amount;
             self.update_stock(token_id, new_stock);
 
-            self.emit(BuyProduct { token_id, amount: token_amount, price: total_required_tokens });
+            self.emit(BuyProduct { token_id, amount: token_amount, buyer: buyer });
             if (!self.accesscontrol.has_role(CONSUMER, get_caller_address())) {
                 self.accesscontrol._grant_role(CONSUMER, get_caller_address());
             }
@@ -503,7 +510,7 @@ mod Marketplace {
             self
                 .emit(
                     BuyBatchProducts {
-                        token_ids, token_amount, total_price: total_required_tokens,
+                        token_ids, token_amount, buyer: buyer,
                     },
                 );
             // Update stock for products
@@ -622,6 +629,23 @@ mod Marketplace {
             }
             token_ids.span()
         }
+
+        fn add_stock(ref self: ContractState, token_id: u256, amount: u256, data: Span<felt252>) {
+            let producer = get_caller_address();
+            assert(self.seller_products.read(token_id) == producer, 'Not your product');
+            
+            // Mint more 1155 tokens for this token_id
+            let cofi_collection = ICofiCollectionDispatcher {
+                contract_address: self.cofi_collection_address.read() 
+            };
+            cofi_collection.mint(get_contract_address(), token_id, amount, data);
+        
+            // Update marketplace stock
+            let current_stock = self.listed_product_stock.read(token_id);
+            let new_stock = current_stock + amount;
+            self.update_stock(token_id, new_stock);
+        }
+        
 
         fn get_product_price(
             self: @ContractState, token_id: u256, token_amount: u256, payment_token: PAYMENT_TOKEN,
@@ -775,6 +799,28 @@ mod Marketplace {
             // Producers/roasters can read their claim payment from here
             self.claim_balances.read(wallet_address)
         }
+
+        fn get_current_stock(self: @ContractState, token_id: u256) -> u256 {
+            self.listed_product_stock.read(token_id)
+        }
+
+        fn get_current_price(self: @ContractState, token_id: u256) -> u256 {
+            self.listed_product_price.read(token_id)
+        }
+
+        fn update_price(ref self: ContractState, token_id: u256, price: u256) {
+            self.listed_product_price.write(token_id, price);
+        }
+    }
+
+    #[abi(embed_v0)]
+    impl UpgradeableImpl of IUpgradeable<ContractState> {
+        fn upgrade(ref self: ContractState, new_class_hash: ClassHash) {
+            // This function can only be called by the owner
+            self.accesscontrol.assert_only_role(DEFAULT_ADMIN_ROLE);
+            // Replace the class hash upgrading the contract
+            self.upgradeable.upgrade(new_class_hash);
+        }
     }
 
     #[generate_trait]
@@ -792,7 +838,7 @@ mod Marketplace {
             self.seller_is_producer.write(token_id, is_producer);
             self.listed_product_stock.write(token_id, stock);
             self.listed_product_price.write(token_id, price);
-            self.emit(CreateProduct { token_id, initial_stock: stock });
+            self.emit(CreateProduct { token_id, initial_stock: stock, owner: producer, price: price });
         }
 
         fn claim_balance(ref self: ContractState, claim_balance: u256, recipient: ContractAddress) {

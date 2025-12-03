@@ -7,7 +7,7 @@ const deployedContracts = {
   mainnet: {
     CofiCollection: {
       address:
-        "0x79eec7df7a33acdf8f9bbb45681e501583255d7a68d88180d901bddcc00f8f3",
+        "0x79f83c896b6a67273ce9945a1e4d795f8625f77cd627aea4db853bcf8230ed2",
       abi: [
         {
           type: "impl",
@@ -1136,7 +1136,7 @@ const deployedContracts = {
     },
     Distribution: {
       address:
-        "0x54f79cd1f3a136f5361036e449eab28ec6bc23c88cf8b8c717e238ffde45da5",
+        "0x3a82d0cd7eb96ad3511f892604425dea80a2d294202145ab666213dc38c27cc",
       abi: [
         {
           type: "impl",
@@ -1395,6 +1395,29 @@ const deployedContracts = {
               type: "function",
               name: "distribute",
               inputs: [],
+              outputs: [],
+              state_mutability: "external",
+            },
+          ],
+        },
+        {
+          type: "impl",
+          name: "UpgradeableImpl",
+          interface_name: "openzeppelin_upgrades::interface::IUpgradeable",
+        },
+        {
+          type: "interface",
+          name: "openzeppelin_upgrades::interface::IUpgradeable",
+          items: [
+            {
+              type: "function",
+              name: "upgrade",
+              inputs: [
+                {
+                  name: "new_class_hash",
+                  type: "core::starknet::class_hash::ClassHash",
+                },
+              ],
               outputs: [],
               state_mutability: "external",
             },
@@ -1782,11 +1805,11 @@ const deployedContracts = {
         },
       ],
       classHash:
-        "0x19a04b0531e4bb2b57d75e8d4cf5c6e536280f626aa015fe4cfecbde0defc8c",
+        "0x436a4b27462b6ca4dd66bcecb8f52ea4341636a5679c6cde2d49918481ece4e",
     },
     Marketplace: {
       address:
-        "0x326258757d0725f3bcfa1e38df2e6fb1c3539f939e5476975e9363f03e88779",
+        "0x393e1d6145acc0724683beb6ac90773178effd206f36d5180b7804719d9464c",
       abi: [
         {
           type: "impl",
@@ -2019,6 +2042,26 @@ const deployedContracts = {
             },
             {
               type: "function",
+              name: "add_stock",
+              inputs: [
+                {
+                  name: "token_id",
+                  type: "core::integer::u256",
+                },
+                {
+                  name: "amount",
+                  type: "core::integer::u256",
+                },
+                {
+                  name: "data",
+                  type: "core::array::Span::<core::felt252>",
+                },
+              ],
+              outputs: [],
+              state_mutability: "external",
+            },
+            {
+              type: "function",
               name: "get_product_price",
               inputs: [
                 {
@@ -2161,6 +2204,77 @@ const deployedContracts = {
                 },
               ],
               state_mutability: "view",
+            },
+            {
+              type: "function",
+              name: "get_current_stock",
+              inputs: [
+                {
+                  name: "token_id",
+                  type: "core::integer::u256",
+                },
+              ],
+              outputs: [
+                {
+                  type: "core::integer::u256",
+                },
+              ],
+              state_mutability: "view",
+            },
+            {
+              type: "function",
+              name: "get_current_price",
+              inputs: [
+                {
+                  name: "token_id",
+                  type: "core::integer::u256",
+                },
+              ],
+              outputs: [
+                {
+                  type: "core::integer::u256",
+                },
+              ],
+              state_mutability: "view",
+            },
+            {
+              type: "function",
+              name: "update_price",
+              inputs: [
+                {
+                  name: "token_id",
+                  type: "core::integer::u256",
+                },
+                {
+                  name: "price",
+                  type: "core::integer::u256",
+                },
+              ],
+              outputs: [],
+              state_mutability: "external",
+            },
+          ],
+        },
+        {
+          type: "impl",
+          name: "UpgradeableImpl",
+          interface_name: "openzeppelin_upgrades::interface::IUpgradeable",
+        },
+        {
+          type: "interface",
+          name: "openzeppelin_upgrades::interface::IUpgradeable",
+          items: [
+            {
+              type: "function",
+              name: "upgrade",
+              inputs: [
+                {
+                  name: "new_class_hash",
+                  type: "core::starknet::class_hash::ClassHash",
+                },
+              ],
+              outputs: [],
+              state_mutability: "external",
             },
           ],
         },
@@ -2550,6 +2664,16 @@ const deployedContracts = {
               type: "core::integer::u256",
               kind: "data",
             },
+            {
+              name: "owner",
+              type: "core::starknet::contract_address::ContractAddress",
+              kind: "data",
+            },
+            {
+              name: "price",
+              type: "core::integer::u256",
+              kind: "data",
+            },
           ],
         },
         {
@@ -2585,8 +2709,8 @@ const deployedContracts = {
               kind: "data",
             },
             {
-              name: "price",
-              type: "core::integer::u256",
+              name: "buyer",
+              type: "core::starknet::contract_address::ContractAddress",
               kind: "data",
             },
           ],
@@ -2607,8 +2731,8 @@ const deployedContracts = {
               kind: "data",
             },
             {
-              name: "total_price",
-              type: "core::integer::u256",
+              name: "buyer",
+              type: "core::starknet::contract_address::ContractAddress",
               kind: "data",
             },
           ],
@@ -2694,7 +2818,7 @@ const deployedContracts = {
         },
       ],
       classHash:
-        "0x6f1abf4e3ed2e5596b1b9feadf3aa5ded6dab8929d79c9116b55def5ce5dee8",
+        "0x492a95ac00f9ac4d7bc00083081b12cf82a431eb46cc428fa822fbaec0646c6",
     },
   },
 } as const;
