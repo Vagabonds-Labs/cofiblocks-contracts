@@ -1,17 +1,12 @@
 {
-  "CofiCollection": {
-    "classHash": "0x7463d920bd22b863168f817135bfe755c739f237f36750918a2463fe491d99f",
-    "address": "0x79f83c896b6a67273ce9945a1e4d795f8625f77cd627aea4db853bcf8230ed2",
-    "contract": "CofiCollection"
-  },
   "Distribution": {
-    "classHash": "0x436a4b27462b6ca4dd66bcecb8f52ea4341636a5679c6cde2d49918481ece4e",
+    "contract": "Distribution",
     "address": "0x3a82d0cd7eb96ad3511f892604425dea80a2d294202145ab666213dc38c27cc",
-    "contract": "Distribution"
+    "classHash": "0x436a4b27462b6ca4dd66bcecb8f52ea4341636a5679c6cde2d49918481ece4e"
   },
   "Marketplace": {
-    "classHash": "0x492a95ac00f9ac4d7bc00083081b12cf82a431eb46cc428fa822fbaec0646c6",
+    "contract": "Marketplace",
     "address": "0x393e1d6145acc0724683beb6ac90773178effd206f36d5180b7804719d9464c",
-    "contract": "Marketplace"
+    "classHash": "0x741ecc8a88dba4d3d2da6109b1f08bd4c8ea712f0d769fcf47d37e04f35953d"
   }
 }

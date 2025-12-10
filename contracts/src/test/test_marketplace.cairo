@@ -185,27 +185,6 @@ mod test_marketplace {
     }
 
     #[test]
-    fn test_create_products() {
-        let (cofi_collection, _, marketplace) = deploy_contracts();
-
-        // Create a producer
-        start_cheat_caller_address(marketplace.contract_address, OWNER());
-        let PRODUCER = 'PRODUCER'.try_into().unwrap();
-        marketplace.assign_producer_role(PRODUCER);
-
-        // Give marketplace permission to mint tokens
-        start_cheat_caller_address(cofi_collection.contract_address, OWNER());
-        cofi_collection.set_minter(marketplace.contract_address);
-
-        // Create a product
-        start_cheat_caller_address(marketplace.contract_address, PRODUCER);
-        let initial_stock = array![10, 9].span();
-        let price = array![1 * ONE_E18, 2 * ONE_E18].span();
-        let token_ids = marketplace.create_products(initial_stock, price);
-        assert(token_ids == array![1, 2].span(), 'invalid token ids');
-    }
-
-    #[test]
     #[fork("MAINNET_LATEST")]
     fn test_buy_product_stark() {
         let (cofi_collection, _, marketplace) = deploy_contracts();
@@ -340,70 +319,6 @@ mod test_marketplace {
         assert(usdc_in_contract >= price * amount_to_buy, 'invalid usdc in contract');
     }
 
-    #[test]
-    #[fork("MAINNET_LATEST")]
-    fn test_buy_products() {
-        let (cofi_collection, distribution, marketplace) = deploy_contracts();
-        let CONSUMER = deploy_receiver();
-
-        // Create a producer
-        start_cheat_caller_address(marketplace.contract_address, OWNER());
-        let PRODUCER = 'PRODUCER'.try_into().unwrap();
-        marketplace.assign_producer_role(PRODUCER);
-
-        // Give marketplace permission to mint tokens
-        start_cheat_caller_address(cofi_collection.contract_address, OWNER());
-        cofi_collection.set_minter(marketplace.contract_address);
-
-        // Create a product
-        start_cheat_caller_address(marketplace.contract_address, PRODUCER);
-        let initial_stock = array![10, 9].span();
-        let price = array![1000000, 2000000].span();
-        let token_ids = marketplace.create_products(initial_stock, price);
-
-        // Create a consumer
-        start_cheat_caller_address(marketplace.contract_address, OWNER());
-        marketplace.assign_producer_role(CONSUMER);
-
-        // Fund buyer wallet
-        let minter_address = STRK_TOKEN_MINTER_ADDRESS.try_into().unwrap();
-        let token_address = MainnetConfig::STRK_ADDRESS.try_into().unwrap();
-        let token_dispatcher = IERC20Dispatcher { contract_address: token_address };
-
-        let token1_price = marketplace.get_product_price(*token_ids.at(0), 2, PAYMENT_TOKEN::STRK);
-        let token2_price = marketplace.get_product_price(*token_ids.at(1), 3, PAYMENT_TOKEN::STRK);
-        let total_price_in_stark = token1_price + token2_price;
-
-        start_cheat_caller_address(token_address, minter_address);
-        let mut calldata = array![];
-        calldata.append_serde(CONSUMER);
-        calldata.append_serde(total_price_in_stark);
-        call_contract_syscall(token_address, selector!("permissioned_mint"), calldata.span())
-            .unwrap();
-
-        assert(token_dispatcher.balance_of(CONSUMER) == total_price_in_stark, 'invalid balance');
-
-        // Approve marketplace to spend buyer's tokens
-        start_cheat_caller_address(token_address, CONSUMER);
-        token_dispatcher.approve(marketplace.contract_address, total_price_in_stark);
-
-        // Buy a product
-        cheat_caller_address(marketplace.contract_address, CONSUMER, CheatSpan::TargetCalls(1));
-        stop_cheat_caller_address(token_address);
-        stop_cheat_caller_address(cofi_collection.contract_address);
-        let token_amounts = array![2, 3].span();
-        marketplace.buy_products(token_ids, token_amounts, PAYMENT_TOKEN::STRK);
-
-        // Distribute and check earnings
-        cheat_caller_address(distribution.contract_address, OWNER(), CheatSpan::TargetCalls(1));
-        distribution.distribute();
-
-        let buyer_claim = distribution.coffee_lover_claim_balance(CONSUMER);
-        // total sell: 2 * 1 USD + 3 * 2 USD = 8 USD
-        // profit: 8 * 2.5% = 0.2 USD
-        // buyer claim: 0.2 USD * 30% = 0.06 USD
-        assert(buyer_claim == 60_000, 'invalid buyer claim');
-    }
 
     #[test]
     fn test_delete_product() {
@@ -435,36 +350,6 @@ mod test_marketplace {
         assert(tokens_after == 0, 'invalid tokens after');
     }
 
-    #[test]
-    fn test_delete_products() {
-        let (cofi_collection, _, marketplace) = deploy_contracts();
-
-        // Create a producer
-        start_cheat_caller_address(marketplace.contract_address, OWNER());
-        let PRODUCER = 'PRODUCER'.try_into().unwrap();
-        marketplace.assign_producer_role(PRODUCER);
-
-        // Give marketplace permission to mint tokens
-        start_cheat_caller_address(cofi_collection.contract_address, OWNER());
-        cofi_collection.set_minter(marketplace.contract_address);
-
-        // Create products
-        start_cheat_caller_address(marketplace.contract_address, PRODUCER);
-        let initial_stock = array![10, 9].span();
-        let price = array![1 * ONE_E18, 2 * ONE_E18].span();
-        let token_ids = marketplace.create_products(initial_stock, price);
-
-        // Delete the product
-        start_cheat_caller_address(cofi_collection.contract_address, marketplace.contract_address);
-        let tokens_before = cofi_collection
-            .balance_of(marketplace.contract_address, *token_ids.at(0));
-        assert(tokens_before == 10, 'invalid tokens before');
-
-        marketplace.delete_products(token_ids);
-        let tokens_after = cofi_collection
-            .balance_of(marketplace.contract_address, *token_ids.at(0));
-        assert(tokens_after == 0, 'invalid tokens after');
-    }
 
     #[test]
     #[fork("MAINNET_LATEST")]
