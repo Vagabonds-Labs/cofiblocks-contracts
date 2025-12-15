@@ -676,7 +676,9 @@ mod Marketplace {
             self.seller_is_producer.write(token_id, is_producer);
             self.listed_product_stock.write(token_id, stock);
             self.listed_product_price.write(token_id, price);
-            self.emit(CreateProduct { token_id, initial_stock: stock, owner: producer, price: price });
+
+            let price_with_fee = price + self.calculate_fee(price, self.market_fee.read());
+            self.emit(CreateProduct { token_id, initial_stock: stock, owner: producer, price: price_with_fee });
         }
 
         fn claim_balance(ref self: ContractState, claim_balance: u256, recipient: ContractAddress) {
