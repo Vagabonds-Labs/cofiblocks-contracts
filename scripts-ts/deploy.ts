@@ -129,11 +129,22 @@ const deployScript = async (): Promise<void> => {
 		constructorArgs: { admin },
 	});
 
+	// usdc address in mainnet
+	let usdcAddress = "0x033068f6539f8e6e6b131e6b2b814e6c34a5224bc66947c47dab9dfee93b35fb";
+	if (argv.network === "sepolia") {
+		const { address } = await deployContract({
+			contract: "MockUSDC",
+			constructorArgs: { default_admin: admin, minter: admin, upgrader: admin },
+		});
+		usdcAddress = address;
+	}
+
 	const { address: marketplaceAddress } = await deployContract({
 		contract: "Marketplace",
 		constructorArgs: {
 			cofi_collection_address: cofiCollectionAddress,
 			distribution_address: distributionAddress,
+			usdc_address: usdcAddress,
 			admin,
 			market_fee: BigInt(5000),
 		},

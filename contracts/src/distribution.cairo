@@ -39,7 +39,7 @@ mod Distribution {
     use openzeppelin::introspection::src5::SRC5Component;
     use openzeppelin::token::erc1155::erc1155_receiver::ERC1155ReceiverComponent;
     use openzeppelin::upgrades::UpgradeableComponent;
-    use openzeppelin::upgrades::interface::IUpgradeable;
+    use openzeppelin::interfaces::upgrades::IUpgradeable;
     use starknet::{ClassHash, ContractAddress};
     use starknet::storage::{
         Map, MutableVecTrait, StoragePointerReadAccess, StoragePointerWriteAccess, Vec,

@@ -9,6 +9,7 @@ mod test {
     mod test_marketplace;
 }
 
+#[cfg(feature: 'mock_contracts')]
 mod mock_contracts {
-    mod Receiver;
+    mod mock_usdc;
 }

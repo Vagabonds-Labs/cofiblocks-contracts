@@ -9,6 +9,7 @@ interface CommandLineOptions {
 	network?: string; // The --network option
 	reset?: boolean;
 	upgrade?: boolean;
+	feature?: string;
 }
 
 function main() {
@@ -36,6 +37,11 @@ function main() {
 			description: "Upgrade contracts (Distribution + Marketplace)",
 			default: false,
 		})
+		.option("feature", {
+			type: "string",
+			description: "Feature to deploy",
+			default: "",
+		})
 		.demandOption(["network"])
 		.strict() // This will make yargs throw an error for unknown options
 		.help()
@@ -51,7 +57,7 @@ function main() {
 	const resetFlag = argv.reset === false ? "--no-reset" : "";
 
 	try {
-		smartCompile();
+		smartCompile({ force: argv.feature?.length > 0 ? true : false }, argv.feature || "");
 
 		const command = `ts-node scripts-ts/deploy.ts --network ${argv.network || "devnet"}${resetFlag ? ` ${resetFlag}` : ""}${argv.upgrade ? ` --upgrade` : ""} && ts-node scripts-ts/helpers/parse-deployments.ts`;
 

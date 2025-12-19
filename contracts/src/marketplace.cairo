@@ -86,9 +86,6 @@ pub mod MainnetConfig {
     pub const STARK_USDC_POOL_KEY: u128 = 170141183460469235273462165868118016;
     pub const STARK_USDC_TICK_SPACING: u128 = 1000;
 
-    pub const USDC_ADDRESS: felt252 =
-        0x033068f6539f8e6e6b131e6b2b814e6c34a5224bc66947c47dab9dfee93b35fb;
-
     pub const EKUBO_ADDRESS: felt252 =
         0x00000005dd3D2F4429AF886cD1a3b08289DBcEa99A294197E9eB43b0e0325b4b;
 }
@@ -104,9 +101,9 @@ mod Marketplace {
     use openzeppelin::access::accesscontrol::{AccessControlComponent, DEFAULT_ADMIN_ROLE};
     use openzeppelin::introspection::src5::SRC5Component;
     use openzeppelin::token::erc1155::erc1155_receiver::ERC1155ReceiverComponent;
-    use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
+    use openzeppelin::interfaces::token::erc20::{IERC20Dispatcher, IERC20DispatcherTrait};
     use openzeppelin::upgrades::UpgradeableComponent;
-    use openzeppelin::upgrades::interface::IUpgradeable;
+    use openzeppelin::interfaces::upgrades::IUpgradeable;
     use starknet::event::EventEmitter;
     use starknet::storage::Map;
     use starknet::{ClassHash, ContractAddress, get_caller_address, get_contract_address};
@@ -173,6 +170,7 @@ mod Marketplace {
         cofi_collection_address: ContractAddress,
         seller_claim_balances: Map<ContractAddress, u256>,
         current_token_id: u256,
+        usdc_address: ContractAddress,
         ekubo: ICoreDispatcher,
     }
 
@@ -270,6 +268,7 @@ mod Marketplace {
         ref self: ContractState,
         cofi_collection_address: ContractAddress,
         distribution_address: ContractAddress,
+        usdc_address: ContractAddress,
         admin: ContractAddress,
         market_fee: u256,
     ) {
@@ -277,6 +276,7 @@ mod Marketplace {
         self.accesscontrol.initializer();
         self.accesscontrol._grant_role(DEFAULT_ADMIN_ROLE, admin);
         self.cofi_collection_address.write(cofi_collection_address);
+        self.usdc_address.write(usdc_address);
         self.distribution.write(IDistributionDispatcher { contract_address: distribution_address });
         self
             .ekubo
@@ -591,7 +591,7 @@ mod Marketplace {
             self.accesscontrol.assert_only_role(DEFAULT_ADMIN_ROLE);
             let token_address = match token {
                 PAYMENT_TOKEN::STRK => MainnetConfig::STRK_ADDRESS.try_into().unwrap(),
-                PAYMENT_TOKEN::USDC => MainnetConfig::USDC_ADDRESS.try_into().unwrap(),
+                PAYMENT_TOKEN::USDC => self.usdc_address.read(),
                 PAYMENT_TOKEN::USDT => MainnetConfig::USDT_ADDRESS.try_into().unwrap(),
             };
             let token_dispatcher = IERC20Dispatcher { contract_address: token_address };
@@ -636,7 +636,7 @@ mod Marketplace {
             assert(claim_balance > 0, 'No tokens to claim');
 
             let usdc_token_dispatcher = IERC20Dispatcher {
-                contract_address: MainnetConfig::USDC_ADDRESS.try_into().unwrap(),
+                contract_address: self.usdc_address.read(),
             };
             let marketplace_balance = usdc_token_dispatcher.balance_of(get_contract_address());
             assert(claim_balance <= marketplace_balance, 'Contract insufficient balance');
@@ -672,7 +672,7 @@ mod Marketplace {
 
         fn pay_with_token(ref self: ContractState, payment_token: PAYMENT_TOKEN, amount: u256, buyer: ContractAddress) {
             if payment_token == PAYMENT_TOKEN::USDC {
-                let usdc_address = MainnetConfig::USDC_ADDRESS.try_into().unwrap();
+                let usdc_address = self.usdc_address.read();
                 self.transfer_token(usdc_address, amount, buyer);
             } else {
                 let contract_address = if payment_token == PAYMENT_TOKEN::STRK {
@@ -689,7 +689,7 @@ mod Marketplace {
             let ekubo = self.ekubo.read();
             let usdc_stark_pool_key = PoolKey {
                 token0: MainnetConfig::STRK_ADDRESS.try_into().unwrap(),
-                token1: MainnetConfig::USDC_ADDRESS.try_into().unwrap(),
+                token1: self.usdc_address.read(),
                 fee: MainnetConfig::STARK_USDC_POOL_KEY,
                 tick_spacing: MainnetConfig::STARK_USDC_TICK_SPACING,
                 extension: 0x00.try_into().unwrap(),
@@ -758,7 +758,7 @@ mod Marketplace {
         fn swap_token_for_usdc(
             ref self: ContractState, sell_token_address: ContractAddress, sell_token_amount: u256,
         ) {
-            let usdc_address = MainnetConfig::USDC_ADDRESS.try_into().unwrap();
+            let usdc_address = self.usdc_address.read();
             let is_stark = sell_token_address == MainnetConfig::STRK_ADDRESS.try_into().unwrap();
             let pool_key = if is_stark {
                 PoolKey {

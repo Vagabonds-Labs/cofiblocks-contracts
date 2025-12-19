@@ -187,7 +187,7 @@ mod CofiCollection {
     use openzeppelin::security::pausable::PausableComponent;
     use openzeppelin::token::erc1155::ERC1155Component;
     use openzeppelin::upgrades::UpgradeableComponent;
-    use openzeppelin::upgrades::interface::IUpgradeable;
+    use openzeppelin::interfaces::upgrades::IUpgradeable;
     use starknet::{ClassHash, ContractAddress, get_caller_address};
     use super::{MINTER_ROLE, PAUSER_ROLE, UPGRADER_ROLE, URI_SETTER_ROLE};
 

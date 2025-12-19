@@ -160,13 +160,17 @@ function getLatestTargetMtime(targetFiles: Map<string, FileInfo>): number {
 /**
  * Compiles the contracts using scarb build, but only if needed
  */
-export function smartCompile(options: CompileOptions = {}): void {
+export function smartCompile(options: CompileOptions = {}, feature: string = ""): void {
 	const { force = false, verbose = false } = options;
 
 	if (shouldRecompile({ force, verbose })) {
 		console.log("🔨 Compiling contracts...");
 		try {
-			execSync("cd contracts && scarb build", { stdio: "inherit" });
+			if (feature) {
+				execSync(`cd contracts && scarb build --features ${feature}`, { stdio: "inherit" });
+			} else {
+			     execSync("cd contracts && scarb build", { stdio: "inherit" });
+			}
 			console.log("✅ Compilation completed successfully");
 		} catch (error) {
 			console.error("❌ Compilation failed:", error);
@@ -297,7 +301,8 @@ Examples:
 	}
 
 	try {
-		smartCompile({ force, verbose });
+		const feature = args.includes("--feature") ? args[args.indexOf("--feature") + 1] : "";
+		smartCompile({ force, verbose }, feature || "");
 	} catch (error) {
 		console.error("Compilation failed");
 		process.exit(1);
