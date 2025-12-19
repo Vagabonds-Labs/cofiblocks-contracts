@@ -688,6 +688,50 @@ const deployedContracts = {
           interface_name: "contracts::marketplace::IMarketplace",
         },
         {
+          type: "enum",
+          name: "contracts::marketplace::ROLES",
+          variants: [
+            {
+              name: "PRODUCER",
+              type: "()",
+            },
+            {
+              name: "ROASTER",
+              type: "()",
+            },
+            {
+              name: "CAMBIATUS",
+              type: "()",
+            },
+            {
+              name: "COFIBLOCKS",
+              type: "()",
+            },
+            {
+              name: "COFOUNDER",
+              type: "()",
+            },
+            {
+              name: "CONSUMER",
+              type: "()",
+            },
+          ],
+        },
+        {
+          type: "enum",
+          name: "core::bool",
+          variants: [
+            {
+              name: "False",
+              type: "()",
+            },
+            {
+              name: "True",
+              type: "()",
+            },
+          ],
+        },
+        {
           type: "struct",
           name: "core::integer::u256",
           members: [
@@ -720,33 +764,17 @@ const deployedContracts = {
           ],
         },
         {
-          type: "struct",
-          name: "core::array::Span::<core::felt252>",
-          members: [
-            {
-              name: "snapshot",
-              type: "@core::array::Array::<core::felt252>",
-            },
-          ],
-        },
-        {
-          type: "struct",
-          name: "core::array::Span::<core::integer::u256>",
-          members: [
-            {
-              name: "snapshot",
-              type: "@core::array::Array::<core::integer::u256>",
-            },
-          ],
-        },
-        {
           type: "interface",
           name: "contracts::marketplace::IMarketplace",
           items: [
             {
               type: "function",
-              name: "assign_producer_role",
+              name: "assign_role",
               inputs: [
+                {
+                  name: "role",
+                  type: "contracts::marketplace::ROLES",
+                },
                 {
                   name: "assignee",
                   type: "core::starknet::contract_address::ContractAddress",
@@ -757,70 +785,34 @@ const deployedContracts = {
             },
             {
               type: "function",
-              name: "assign_roaster_role",
+              name: "account_has_role",
               inputs: [
                 {
-                  name: "assignee",
+                  name: "role",
+                  type: "contracts::marketplace::ROLES",
+                },
+                {
+                  name: "account",
                   type: "core::starknet::contract_address::ContractAddress",
                 },
               ],
-              outputs: [],
-              state_mutability: "external",
-            },
-            {
-              type: "function",
-              name: "assign_cambiatus_role",
-              inputs: [
+              outputs: [
                 {
-                  name: "assignee",
-                  type: "core::starknet::contract_address::ContractAddress",
+                  type: "core::bool",
                 },
               ],
-              outputs: [],
-              state_mutability: "external",
+              state_mutability: "view",
             },
             {
               type: "function",
-              name: "assign_cofiblocks_role",
+              name: "account_revoke_role",
               inputs: [
                 {
-                  name: "assignee",
-                  type: "core::starknet::contract_address::ContractAddress",
+                  name: "role",
+                  type: "contracts::marketplace::ROLES",
                 },
-              ],
-              outputs: [],
-              state_mutability: "external",
-            },
-            {
-              type: "function",
-              name: "assign_cofounder_role",
-              inputs: [
                 {
-                  name: "assignee",
-                  type: "core::starknet::contract_address::ContractAddress",
-                },
-              ],
-              outputs: [],
-              state_mutability: "external",
-            },
-            {
-              type: "function",
-              name: "assign_consumer_role",
-              inputs: [
-                {
-                  name: "assignee",
-                  type: "core::starknet::contract_address::ContractAddress",
-                },
-              ],
-              outputs: [],
-              state_mutability: "external",
-            },
-            {
-              type: "function",
-              name: "assign_admin_role",
-              inputs: [
-                {
-                  name: "assignee",
+                  name: "revokee",
                   type: "core::starknet::contract_address::ContractAddress",
                 },
               ],
@@ -843,10 +835,6 @@ const deployedContracts = {
                   name: "payment_token",
                   type: "contracts::marketplace::PAYMENT_TOKEN",
                 },
-                {
-                  name: "buyer",
-                  type: "core::starknet::contract_address::ContractAddress",
-                },
               ],
               outputs: [],
               state_mutability: "external",
@@ -864,8 +852,12 @@ const deployedContracts = {
                   type: "core::integer::u256",
                 },
                 {
-                  name: "data",
-                  type: "core::array::Span::<core::felt252>",
+                  name: "associated_producer",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+                {
+                  name: "short_description",
+                  type: "core::felt252",
                 },
               ],
               outputs: [
@@ -886,10 +878,6 @@ const deployedContracts = {
                 {
                   name: "amount",
                   type: "core::integer::u256",
-                },
-                {
-                  name: "data",
-                  type: "core::array::Span::<core::felt252>",
                 },
               ],
               outputs: [],
@@ -926,18 +914,6 @@ const deployedContracts = {
                 {
                   name: "token_id",
                   type: "core::integer::u256",
-                },
-              ],
-              outputs: [],
-              state_mutability: "external",
-            },
-            {
-              type: "function",
-              name: "delete_products",
-              inputs: [
-                {
-                  name: "token_ids",
-                  type: "core::array::Span::<core::integer::u256>",
                 },
               ],
               outputs: [],
@@ -1088,6 +1064,26 @@ const deployedContracts = {
             "openzeppelin_token::erc1155::interface::IERC1155Receiver",
         },
         {
+          type: "struct",
+          name: "core::array::Span::<core::felt252>",
+          members: [
+            {
+              name: "snapshot",
+              type: "@core::array::Array::<core::felt252>",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "core::array::Span::<core::integer::u256>",
+          members: [
+            {
+              name: "snapshot",
+              type: "@core::array::Array::<core::integer::u256>",
+            },
+          ],
+        },
+        {
           type: "interface",
           name: "openzeppelin_token::erc1155::interface::IERC1155Receiver",
           items: [
@@ -1161,20 +1157,6 @@ const deployedContracts = {
           type: "impl",
           name: "SRC5Impl",
           interface_name: "openzeppelin_introspection::interface::ISRC5",
-        },
-        {
-          type: "enum",
-          name: "core::bool",
-          variants: [
-            {
-              name: "False",
-              type: "()",
-            },
-            {
-              name: "True",
-              type: "()",
-            },
-          ],
         },
         {
           type: "interface",
@@ -1581,6 +1563,23 @@ const deployedContracts = {
         },
         {
           type: "event",
+          name: "contracts::marketplace::Marketplace::RevokedRole",
+          kind: "struct",
+          members: [
+            {
+              name: "role",
+              type: "core::felt252",
+              kind: "data",
+            },
+            {
+              name: "revokee",
+              type: "core::starknet::contract_address::ContractAddress",
+              kind: "data",
+            },
+          ],
+        },
+        {
+          type: "event",
           name: "contracts::marketplace::Marketplace::Event",
           kind: "enum",
           variants: [
@@ -1639,11 +1638,16 @@ const deployedContracts = {
               type: "contracts::marketplace::Marketplace::AssignedRole",
               kind: "nested",
             },
+            {
+              name: "RevokedRole",
+              type: "contracts::marketplace::Marketplace::RevokedRole",
+              kind: "nested",
+            },
           ],
         },
       ],
       classHash:
-        "0x741ecc8a88dba4d3d2da6109b1f08bd4c8ea712f0d769fcf47d37e04f35953d",
+        "0x5d0fe2c51c181b77f97dbcbc971951354e35351f0dd696874415d5ac8c72954",
     },
   },
 } as const;

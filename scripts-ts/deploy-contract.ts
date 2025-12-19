@@ -412,7 +412,7 @@ const deployContract = async (
 	};
 };
 
-export const declareOnly = async (contractName: string, options?: UniversalDetails) => {
+export const declareOnly = async (contractName: string) => {
 	const compiledContractCasm = JSON.parse(
 		fs.readFileSync(findContractFile(contractName, "compiled_contract_class")).toString("ascii")
 	);
@@ -429,6 +429,18 @@ export const declareOnly = async (contractName: string, options?: UniversalDetai
 	};
 
 	// Simply call declare (NO constructor, NO deployment)
+	let options: UniversalDetails = {};
+	try {
+		const estimate = await deployer.estimateDeclareFee(
+			payload,
+		);
+		options = {
+			resourceBounds: estimate.resourceBounds,
+		};
+		console.info('resource bounds are', options.resourceBounds);
+	} catch (e) {
+		console.error('error on estimateDeclareFee, skipping resource bounds');
+	}
 	const { classHash } = await declareIfNot_NotWait(payload, options);
 
 	console.log(green(`✔ Declared classHash for ${contractName}: ${classHash}`));
