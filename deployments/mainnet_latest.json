@@ -2,11 +2,11 @@
   "Distribution": {
     "contract": "Distribution",
     "address": "0x3a82d0cd7eb96ad3511f892604425dea80a2d294202145ab666213dc38c27cc",
-    "classHash": "0x436a4b27462b6ca4dd66bcecb8f52ea4341636a5679c6cde2d49918481ece4e"
+    "classHash": "0x26257801bfcbd1b5c9d2ef6a0c8685384fa4b4640fb2909bba040fde4c2d79a"
   },
   "Marketplace": {
     "contract": "Marketplace",
     "address": "0x393e1d6145acc0724683beb6ac90773178effd206f36d5180b7804719d9464c",
-    "classHash": "0x5d0fe2c51c181b77f97dbcbc971951354e35351f0dd696874415d5ac8c72954"
+    "classHash": "0x14835e2c14ccd92dcb5be9fef8f1dbaf3823f06c0453add8f7d29044b60ae9c"
   }
 }

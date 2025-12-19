@@ -13,6 +13,7 @@ pub trait IDistribution<TContractState> {
         buyer_address: ContractAddress,
         product_owner_address: ContractAddress,
         is_producer: bool,
+        producer_address: ContractAddress,
         product_price: u256,
         profit: u256,
     );
@@ -170,6 +171,7 @@ mod Distribution {
             buyer_address: ContractAddress,
             product_owner_address: ContractAddress,
             is_producer: bool,
+            producer_address: ContractAddress,
             product_price: u256,
             profit: u256,
         ) {
@@ -206,7 +208,6 @@ mod Distribution {
                     .write(product_owner_address, current_roaster_amount + amount);
 
                 // Register roaster-producer relationship
-                let producer_address = self.roasters_producers.read(product_owner_address);
                 if producer_address != 0x00.try_into().unwrap() {
                     let current_producer_amount = self.purchase_per_producer.read(producer_address);
 

@@ -424,10 +424,12 @@ mod Marketplace {
             let distribution = self.distribution.read();
             let profit = listed_product.price_usdc_with_fee - listed_product.price_usdc;
             let is_producer = listed_product.is_producer;
+            let associated_producer = listed_product.associated_producer;
             listed_product.sells = listed_product.sells + token_amount;
             self.listed_products.write(token_id, listed_product);
-            distribution
-                .register_purchase(buyer, seller_address, is_producer, producer_fee, profit);
+            distribution.register_purchase(
+                buyer, seller_address, is_producer, associated_producer, producer_fee, profit
+            );
         }
 
         ///
@@ -502,7 +504,6 @@ mod Marketplace {
             let stock = listed_product.stock;
             assert(stock > 0, 'Product not available');
 
-            let mut product_price = listed_product.price_usdc * token_amount;
             let mut total_price = listed_product.price_usdc_with_fee * token_amount;
 
             // Process payment

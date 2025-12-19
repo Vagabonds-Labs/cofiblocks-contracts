@@ -91,6 +91,10 @@ const deployedContracts = {
                   type: "core::bool",
                 },
                 {
+                  name: "producer_address",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+                {
                   name: "product_price",
                   type: "core::integer::u256",
                 },
@@ -676,7 +680,7 @@ const deployedContracts = {
         },
       ],
       classHash:
-        "0x436a4b27462b6ca4dd66bcecb8f52ea4341636a5679c6cde2d49918481ece4e",
+        "0x26257801bfcbd1b5c9d2ef6a0c8685384fa4b4640fb2909bba040fde4c2d79a",
     },
     Marketplace: {
       address:
@@ -1647,7 +1651,7 @@ const deployedContracts = {
         },
       ],
       classHash:
-        "0x5d0fe2c51c181b77f97dbcbc971951354e35351f0dd696874415d5ac8c72954",
+        "0x14835e2c14ccd92dcb5be9fef8f1dbaf3823f06c0453add8f7d29044b60ae9c",
     },
   },
 } as const;
