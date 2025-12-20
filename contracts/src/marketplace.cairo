@@ -33,6 +33,20 @@ struct SwapAfterLockParameters {
     sqrt_ratio_distance: u256,
 }
 
+#[derive(Drop, Serde, starknet::Store)]
+    struct ListedProduct {
+        token_id: u256,
+        stock: u256,
+        sells: u256,
+        price_usdc: u256,
+        price_usdc_with_fee: u256,
+        is_producer: bool,
+        owner: ContractAddress,
+        associated_producer: ContractAddress,
+        short_description: felt252,
+        is_available: bool,
+    }
+
 #[derive(Copy, Drop, Serde)]
 struct SwapResult {
     delta: Delta,
@@ -57,6 +71,7 @@ pub trait IMarketplace<ContractState> {
     fn get_product_price(
         self: @ContractState, token_id: u256, token_amount: u256, payment_token: PAYMENT_TOKEN,
     ) -> u256;
+    fn get_product(self: @ContractState, token_id: u256) -> ListedProduct;
     fn delete_product(ref self: ContractState, token_id: u256);
     fn claim_consumer(ref self: ContractState);
     fn claim_producer(ref self: ContractState);
@@ -107,7 +122,7 @@ mod Marketplace {
     use starknet::event::EventEmitter;
     use starknet::storage::Map;
     use starknet::{ClassHash, ContractAddress, get_caller_address, get_contract_address};
-    use super::{MainnetConfig, PAYMENT_TOKEN, SwapAfterLockParameters, SwapResult, ROLES};
+    use super::{MainnetConfig, PAYMENT_TOKEN, SwapAfterLockParameters, SwapResult, ROLES, ListedProduct};
 
     component!(
         path: ERC1155ReceiverComponent, storage: erc1155_receiver, event: ERC1155ReceiverEvent,
@@ -139,20 +154,6 @@ mod Marketplace {
     const MAX_SQRT_RATIO: u256 = 6277100250585753475930931601400621808602321654880405518632;
     const TWO_E128: u256 = 340282366920938463463374607431768211456;
     const ONE_E12: u256 = 1000000000000;
-
-    #[derive(Drop, Serde, starknet::Store)]
-    struct ListedProduct {
-        token_id: u256,
-        stock: u256,
-        sells: u256,
-        price_usdc: u256,
-        price_usdc_with_fee: u256,
-        is_producer: bool,
-        owner: ContractAddress,
-        associated_producer: ContractAddress,
-        short_description: felt252,
-        is_available: bool,
-    }
 
     #[storage]
     struct Storage {
@@ -370,6 +371,10 @@ mod Marketplace {
             self.accesscontrol.assert_only_role(DEFAULT_ADMIN_ROLE);
             self.accesscontrol._revoke_role(self.role_selector(role), revokee);
             self.emit(RevokedRole { role: self.role_selector(role), revokee: revokee });
+        }
+
+        fn get_product(self: @ContractState, token_id: u256) -> ListedProduct {
+            self.listed_products.read(token_id)
         }
 
         fn buy_product(
