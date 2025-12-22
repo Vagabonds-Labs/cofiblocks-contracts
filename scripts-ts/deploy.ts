@@ -84,11 +84,12 @@ const upgradeMode = async () => {
 
 	const distribution = deployments["Distribution"];
 	const marketplace = deployments["Marketplace"];
+	const swap = deployments["Swap"];
 
-	if (!distribution || !marketplace) {
+	if (!distribution || !marketplace || !swap) {
 		console.error(
 			red(
-				"❌ Cannot upgrade — missing Distribution or Marketplace in deployments/<network>_latest.json"
+				"❌ Cannot upgrade — missing Distribution or Marketplace or Swap in deployments/<network>_latest.json"
 			)
 		);
 		process.exit(1);
@@ -96,6 +97,7 @@ const upgradeMode = async () => {
 
 	await upgradeOne("Distribution", distribution.address);
 	await upgradeOne("Marketplace", marketplace.address);
+	await upgradeOne("Swap", swap.address);
 
 	exportDeployments();
 	console.log(green("✔ All upgrades completed"));
@@ -150,9 +152,19 @@ const deployScript = async (): Promise<void> => {
 		},
 	});
 
+	let swapAddress = "";
+	if (argv.network === "mainnet") {
+		const { address: swapAddressRaw } = await deployContract({
+			contract: "Swap",
+			constructorArgs: { admin },
+		});
+		swapAddress = swapAddressRaw;
+	}
+
 	console.log("CofiCollection:", green(cofiCollectionAddress));
 	console.log("Distribution:", green(distributionAddress));
 	console.log("Marketplace:", green(marketplaceAddress));
+	console.log("Swap:", green(swapAddress));
 
 	await executeDeployCalls();
 
