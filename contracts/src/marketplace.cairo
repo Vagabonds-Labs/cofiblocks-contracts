@@ -1,16 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Compatible with OpenZeppelin Contracts for Cairo ^0.15.0
 
-use ekubo::types::delta::Delta;
-use ekubo::types::keys::PoolKey;
 use starknet::ContractAddress;
-
-#[derive(Copy, Drop, Serde, PartialEq)]
-pub enum PAYMENT_TOKEN {
-    STRK,
-    USDC,
-    USDT,
-}
 
 #[derive(Copy, Drop, Serde, PartialEq)]
 pub enum ROLES {
@@ -20,17 +11,6 @@ pub enum ROLES {
     COFIBLOCKS,
     COFOUNDER,
     CONSUMER,
-}
-
-#[derive(Drop, Copy, Serde)]
-struct SwapAfterLockParameters {
-    contract_address: ContractAddress,
-    to: ContractAddress,
-    sell_token_address: ContractAddress,
-    sell_token_amount: u256,
-    buy_token_address: ContractAddress,
-    pool_key: PoolKey,
-    sqrt_ratio_distance: u256,
 }
 
 #[derive(Drop, Serde, starknet::Store)]
@@ -47,19 +27,13 @@ struct SwapAfterLockParameters {
         is_available: bool,
     }
 
-#[derive(Copy, Drop, Serde)]
-struct SwapResult {
-    delta: Delta,
-}
 
 #[starknet::interface]
 pub trait IMarketplace<ContractState> {
     fn assign_role(ref self: ContractState, role: ROLES, assignee: ContractAddress);
     fn account_has_role(self: @ContractState, role: ROLES, account: ContractAddress) -> bool;
     fn account_revoke_role(ref self: ContractState, role: ROLES, revokee: ContractAddress);
-    fn buy_product(
-        ref self: ContractState, token_id: u256, token_amount: u256, payment_token: PAYMENT_TOKEN
-    );
+    fn buy_product(ref self: ContractState, token_id: u256, token_amount: u256);
     fn create_product(
         ref self: ContractState, 
         initial_stock: u256, 
@@ -68,51 +42,19 @@ pub trait IMarketplace<ContractState> {
         short_description: felt252
     ) -> u256;
     fn add_stock(ref self: ContractState, token_id: u256, amount: u256);
-    fn get_product_price(
-        self: @ContractState, token_id: u256, token_amount: u256, payment_token: PAYMENT_TOKEN,
-    ) -> u256;
     fn get_product(self: @ContractState, token_id: u256) -> ListedProduct;
     fn delete_product(ref self: ContractState, token_id: u256);
-    fn claim_consumer(ref self: ContractState);
-    fn claim_producer(ref self: ContractState);
-    fn claim_roaster(ref self: ContractState);
-    fn claim_cambiatus(ref self: ContractState);
-    fn claim_cofiblocks(ref self: ContractState);
-    fn claim_cofounder(ref self: ContractState);
-    fn locked(ref self: ContractState, id: u32, data: Array<felt252>) -> Array<felt252>;
-    fn withdraw(ref self: ContractState, token: PAYMENT_TOKEN);
-    fn claim_payment(ref self: ContractState);
-    fn get_claim_payment(self: @ContractState, wallet_address: ContractAddress) -> u256;
-    fn get_current_stock(self: @ContractState, token_id: u256) -> u256;
-}
-
-pub mod MainnetConfig {
-    pub const USDT_ADDRESS: felt252 =
-        0x068f5c6a61780768455de69077e07e89787839bf8166decfbf92b645209c0fb8;
-
-    pub const STRK_ADDRESS: felt252 =
-        0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d;
-
-    // https://app.ekubo.org/positions/new?baseCurrency=USDC&quoteCurrency=USDT&step=1&initialTick=-20083671&fee=34028236692093847977029636859101184&tickSpacing=200&tickLower=-96800&tickUpper=136200
-    pub const USDT_USDC_POOL_KEY: u128 = 34028236692093847977029636859101184;
-    pub const USDT_USDC_TICK_SPACING: u128 = 200;
-
-    // https://app.ekubo.org/positions/new?baseCurrency=STRK&quoteCurrency=USDC&step=1&initialTick=-20083671&fee=170141183460469235273462165868118016&tickSpacing=1000&tickLower=-29711000&tickUpper=-29679000
-    pub const STARK_USDC_POOL_KEY: u128 = 170141183460469235273462165868118016;
-    pub const STARK_USDC_TICK_SPACING: u128 = 1000;
-
-    pub const EKUBO_ADDRESS: felt252 =
-        0x00000005dd3D2F4429AF886cD1a3b08289DBcEa99A294197E9eB43b0e0325b4b;
+    fn withdraw_distribution_balance(ref self: ContractState, role: ROLES);
+    fn withdraw(ref self: ContractState, amount: u256, recipient: ContractAddress);
+    fn withdraw_seller_balance(ref self: ContractState);
+    fn get_seller_balance(self: @ContractState, wallet_address: ContractAddress) -> u256;
+    fn get_tokens_by_holder(self: @ContractState, wallet_address: ContractAddress) -> Array<u256>;
 }
 
 #[starknet::contract]
 mod Marketplace {
     use contracts::cofi_collection::{ICofiCollectionDispatcher, ICofiCollectionDispatcherTrait};
     use contracts::distribution::{IDistributionDispatcher, IDistributionDispatcherTrait};
-    use ekubo::components::shared_locker::{check_caller_is_core, handle_delta};
-    use ekubo::interfaces::core::{ICoreDispatcher, ICoreDispatcherTrait, SwapParameters};
-    use ekubo::types::i129::i129;
-    use ekubo::types::keys::PoolKey;
     use openzeppelin::access::accesscontrol::{AccessControlComponent, DEFAULT_ADMIN_ROLE};
     use openzeppelin::introspection::src5::SRC5Component;
     use openzeppelin::token::erc1155::erc1155_receiver::ERC1155ReceiverComponent;
@@ -120,9 +62,12 @@ mod Marketplace {
     use openzeppelin::upgrades::UpgradeableComponent;
     use openzeppelin::interfaces::upgrades::IUpgradeable;
     use starknet::event::EventEmitter;
-    use starknet::storage::Map;
+    use starknet::storage::{
+        Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
+        StoragePointerWriteAccess, StoragePathEntry, Vec, MutableVecTrait, VecTrait
+    };
     use starknet::{ClassHash, ContractAddress, get_caller_address, get_contract_address};
-    use super::{MainnetConfig, PAYMENT_TOKEN, SwapAfterLockParameters, SwapResult, ROLES, ListedProduct};
+    use super::{ROLES, ListedProduct};
 
     component!(
         path: ERC1155ReceiverComponent, storage: erc1155_receiver, event: ERC1155ReceiverEvent,
@@ -150,11 +95,6 @@ mod Marketplace {
     // Upgradeable
     impl UpgradeableInternalImpl = UpgradeableComponent::InternalImpl<ContractState>;
 
-    const MIN_SQRT_RATIO: u256 = 18446748437148339061;
-    const MAX_SQRT_RATIO: u256 = 6277100250585753475930931601400621808602321654880405518632;
-    const TWO_E128: u256 = 340282366920938463463374607431768211456;
-    const ONE_E12: u256 = 1000000000000;
-
     #[storage]
     struct Storage {
         #[substorage(v0)]
@@ -172,7 +112,7 @@ mod Marketplace {
         seller_claim_balances: Map<ContractAddress, u256>,
         current_token_id: u256,
         usdc_address: ContractAddress,
-        ekubo: ICoreDispatcher,
+        token_holders: Map<ContractAddress, Vec<u256>>,
     }
 
     #[event]
@@ -279,84 +219,12 @@ mod Marketplace {
         self.cofi_collection_address.write(cofi_collection_address);
         self.usdc_address.write(usdc_address);
         self.distribution.write(IDistributionDispatcher { contract_address: distribution_address });
-        self
-            .ekubo
-            .write(
-                ICoreDispatcher {
-                    contract_address: MainnetConfig::EKUBO_ADDRESS.try_into().unwrap(),
-                },
-            );
         self.market_fee.write(market_fee);
         self.current_token_id.write(1);
     }
 
     #[abi(embed_v0)]
     impl MarketplaceImpl of super::IMarketplace<ContractState> {
-        fn locked(ref self: ContractState, id: u32, data: Array<felt252>) -> Array<felt252> {
-            // This function can only be called by ekubo
-            let ekubo = self.ekubo.read();
-            check_caller_is_core(ekubo);
-
-            // Deserialize data
-            let mut input_span = data.span();
-            let mut params = Serde::<SwapAfterLockParameters>::deserialize(ref input_span)
-                .expect('Invalid callback data');
-
-            let is_token1 = params.pool_key.token1 == params.sell_token_address;
-            // Swap
-            assert(params.sell_token_amount.high == 0, 'Overflow: Unsupported amount');
-            let pool_price = ekubo.get_pool_price(params.pool_key);
-            let sqrt_ratio_limit = self
-                .compute_sqrt_ratio_limit(
-                    pool_price.sqrt_ratio,
-                    params.sqrt_ratio_distance,
-                    is_token1,
-                    MIN_SQRT_RATIO,
-                    MAX_SQRT_RATIO,
-                );
-
-            let swap_params = SwapParameters {
-                amount: i129 { mag: params.sell_token_amount.low, sign: false },
-                is_token1,
-                sqrt_ratio_limit,
-                skip_ahead: 100,
-            };
-            let mut delta = ekubo.swap(params.pool_key, swap_params);
-
-            let pay_amount = if is_token1 {
-                delta.amount1
-            } else {
-                delta.amount0
-            };
-
-            let buy_amount = if is_token1 {
-                delta.amount0
-            } else {
-                delta.amount1
-            };
-
-            // Pay the tokens we owe for the swap
-            handle_delta(
-                core: ekubo,
-                token: params.sell_token_address,
-                delta: pay_amount,
-                recipient: params.to,
-            );
-
-            // Receive the tokens we bought
-            handle_delta(
-                core: ekubo,
-                token: params.buy_token_address,
-                delta: buy_amount,
-                recipient: params.to,
-            );
-
-            let swap_result = SwapResult { delta };
-            let mut arr: Array<felt252> = ArrayTrait::new();
-            Serde::serialize(@swap_result, ref arr);
-            arr
-        }
-
         fn assign_role(ref self: ContractState, role: ROLES, assignee: ContractAddress) {
             self.accesscontrol.assert_only_role(DEFAULT_ADMIN_ROLE);
             self.accesscontrol._grant_role(self.role_selector(role), assignee);
@@ -377,64 +245,41 @@ mod Marketplace {
             self.listed_products.read(token_id)
         }
 
-        fn buy_product(
-            ref self: ContractState,
-            token_id: u256,
-            token_amount: u256,
-            payment_token: PAYMENT_TOKEN
-        ) {
+        fn buy_product(ref self: ContractState, token_id: u256, token_amount: u256) {
             let buyer = get_caller_address();
             let mut listed_product = self.listed_products.read(token_id);
             let stock = listed_product.stock;
             assert(stock >= token_amount, 'Not enough stock');
             assert(listed_product.is_available, 'Product not available');
-            
-            let seller_address = listed_product.owner;
-            let contract_address = get_contract_address();
 
             let mut producer_fee = listed_product.price_usdc * token_amount;
-            let mut total_required_tokens = self
-                .get_product_price(token_id, token_amount, payment_token);
-
-            // Process payment
-           self.pay_with_token(payment_token, total_required_tokens, buyer);
+            let mut total_usdc = listed_product.price_usdc_with_fee * token_amount;
+            self.pay_for_product(total_usdc, buyer);
+            self.emit(BuyProduct { token_id, amount: token_amount, buyer: buyer });
 
             // Transfer the nft products
-            let cofi_collection = ICofiCollectionDispatcher {
-                contract_address: self.cofi_collection_address.read(),
-            };
-            cofi_collection
-                .safe_transfer_from(
-                    contract_address, buyer, token_id, token_amount, array![0].span(),
-                );
+            self.transfer_nfts(buyer, token_id, token_amount);
 
-            // Update stock
+            self.assign_consumer_role(buyer);
+
+            // Register payment to the producer
+            self.seller_claim_balances.write(
+                listed_product.owner, self.seller_claim_balances.read(listed_product.owner) + producer_fee
+            );
+            self.emit(PaymentSeller { 
+                token_ids: array![token_id].span(), seller: listed_product.owner, payment: producer_fee 
+            });
+
             let new_stock = stock - token_amount;
             listed_product.stock = new_stock;
-            self.emit(UpdateStock { token_id, new_stock });
-
-            self.emit(BuyProduct { token_id, amount: token_amount, buyer: buyer });
-            if (!self.accesscontrol.has_role(self.role_selector(ROLES::CONSUMER), buyer)) {
-                self.accesscontrol._grant_role(self.role_selector(ROLES::CONSUMER), buyer);
-            }
-
-            // Send payment to the producer
-            self
-                .seller_claim_balances
-                .write(seller_address, self.seller_claim_balances.read(seller_address) + producer_fee);
-            let token_ids = array![token_id].span();
-            self.emit(PaymentSeller { token_ids, seller: seller_address, payment: producer_fee });
+            listed_product.sells = listed_product.sells + token_amount;
 
             // Register purchase in the distribution contract
-            let distribution = self.distribution.read();
-            let profit = listed_product.price_usdc_with_fee - listed_product.price_usdc;
-            let is_producer = listed_product.is_producer;
-            let associated_producer = listed_product.associated_producer;
-            listed_product.sells = listed_product.sells + token_amount;
+            self.register_buy_for_distribution(@listed_product, buyer, token_amount);
+
             self.listed_products.write(token_id, listed_product);
-            distribution.register_purchase(
-                buyer, seller_address, is_producer, associated_producer, producer_fee, profit
-            );
+            self.emit(UpdateStock { token_id, new_stock });
+
         }
 
         ///
@@ -456,10 +301,7 @@ mod Marketplace {
             assert(initial_stock <= 1000, 'Initial_stock max 1000');
 
             let token_id = self.current_token_id.read();
-            let cofi_collection = ICofiCollectionDispatcher {
-                contract_address: self.cofi_collection_address.read(),
-            };
-            cofi_collection.mint(get_contract_address(), token_id, initial_stock, array![].span());
+            self.mint_nfts(token_id, initial_stock);
 
             self.current_token_id.write(token_id + 1);
             let price_with_fee = price + self.calculate_fee(price, self.market_fee.read());
@@ -489,37 +331,13 @@ mod Marketplace {
             assert(listed_product.is_available, 'Product not available');
 
             // Mint more 1155 tokens for this token_id
-            let cofi_collection = ICofiCollectionDispatcher {
-                contract_address: self.cofi_collection_address.read() 
-            };
-            cofi_collection.mint(get_contract_address(), token_id, amount, array![].span());
+            self.mint_nfts(token_id, amount);
         
             // Update marketplace stock
             let new_stock = listed_product.stock + amount;
             listed_product.stock = new_stock;
             self.listed_products.write(token_id, listed_product);
             self.emit(UpdateStock { token_id, new_stock: new_stock });
-        }
-        
-
-        fn get_product_price(
-            self: @ContractState, token_id: u256, token_amount: u256, payment_token: PAYMENT_TOKEN,
-        ) -> u256 {
-            let listed_product = self.listed_products.read(token_id);
-            let stock = listed_product.stock;
-            assert(stock > 0, 'Product not available');
-
-            let mut total_price = listed_product.price_usdc_with_fee * token_amount;
-
-            // Process payment
-            if payment_token == PAYMENT_TOKEN::STRK {
-                return self.usdc_to_strk_wei(total_price);
-            } else if payment_token == PAYMENT_TOKEN::USDC || payment_token == PAYMENT_TOKEN::USDT {
-                return total_price;
-            } else {
-                assert(false, 'Invalid payment token');
-                return 0;
-            }
         }
 
         fn delete_product(ref self: ContractState, token_id: u256) {
@@ -540,88 +358,56 @@ mod Marketplace {
             self.emit(DeleteProduct { token_id });
         }
 
-        fn claim_consumer(ref self: ContractState) {
-            self.accesscontrol.assert_only_role(self.role_selector(ROLES::CONSUMER));
-            let buyer = get_caller_address();
+        fn withdraw_distribution_balance(ref self: ContractState, role: ROLES) {
+            self.accesscontrol.assert_only_role(self.role_selector(role));
+            let recipient = get_caller_address();
             let distribution = self.distribution.read();
-            let claim_balance = distribution.coffee_lover_claim_balance(buyer);
-            self.claim_balance(claim_balance, buyer);
-            distribution.coffee_lover_claim_reset(buyer);
-        }
-
-        fn claim_producer(ref self: ContractState) {
-            self.accesscontrol.assert_only_role(self.role_selector(ROLES::PRODUCER));
-            let producer = get_caller_address();
-            let distribution = self.distribution.read();
-            let claim_balance = distribution.producer_claim_balance(producer);
-            self.claim_balance(claim_balance, producer);
-            distribution.producer_claim_reset(producer);
-        }
-
-        fn claim_roaster(ref self: ContractState) {
-            self.accesscontrol.assert_only_role(self.role_selector(ROLES::ROASTER));
-            let roaster = get_caller_address();
-            let distribution = self.distribution.read();
-            let claim_balance = distribution.roaster_claim_balance(roaster);
-            self.claim_balance(claim_balance, roaster);
-            distribution.roaster_claim_reset(roaster);
-        }
-
-        fn claim_cambiatus(ref self: ContractState) {
-            self.accesscontrol.assert_only_role(self.role_selector(ROLES::CAMBIATUS));
-            let distribution = self.distribution.read();
-            let claim_balance = distribution.cambiatus_claim_balance();
-            self.claim_balance(claim_balance, get_caller_address());
-            distribution.cambiatus_claim_reset();
-        }
-
-        fn claim_cofiblocks(ref self: ContractState) {
-            self.accesscontrol.assert_only_role(self.role_selector(ROLES::COFIBLOCKS));
-            let distribution = self.distribution.read();
-            let claim_balance = distribution.cofiblocks_claim_balance();
-            self.claim_balance(claim_balance, get_caller_address());
-            distribution.cofiblocks_claim_reset();
-        }
-
-        fn claim_cofounder(ref self: ContractState) {
-            self.accesscontrol.assert_only_role(self.role_selector(ROLES::COFOUNDER));
-            let cofounder = get_caller_address();
-            let distribution = self.distribution.read();
-            let claim_balance = distribution.cofounder_claim_balance(cofounder);
-            self.claim_balance(claim_balance, cofounder);
-            distribution.cofounder_claim_reset(cofounder);
-        }
-
-        fn withdraw(ref self: ContractState, token: PAYMENT_TOKEN) {
-            self.accesscontrol.assert_only_role(DEFAULT_ADMIN_ROLE);
-            let token_address = match token {
-                PAYMENT_TOKEN::STRK => MainnetConfig::STRK_ADDRESS.try_into().unwrap(),
-                PAYMENT_TOKEN::USDC => self.usdc_address.read(),
-                PAYMENT_TOKEN::USDT => MainnetConfig::USDT_ADDRESS.try_into().unwrap(),
+            let claim_balance = match role {
+                ROLES::CONSUMER => distribution.coffee_lover_claim_balance(recipient),
+                ROLES::PRODUCER => distribution.producer_claim_balance(recipient),
+                ROLES::ROASTER => distribution.roaster_claim_balance(recipient),
+                ROLES::CAMBIATUS => distribution.cambiatus_claim_balance(),
+                ROLES::COFIBLOCKS => distribution.cofiblocks_claim_balance(),
+                ROLES::COFOUNDER => distribution.cofounder_claim_balance(recipient),
             };
-            let token_dispatcher = IERC20Dispatcher { contract_address: token_address };
-            let balance = token_dispatcher.balance_of(get_contract_address());
-            assert(balance >= 0, 'No tokens to withdraw');
-            let transfer = token_dispatcher.transfer(get_caller_address(), balance);
-            assert(transfer, 'Error withdrawing');
+            self.withdraw_usdc(claim_balance, recipient);
+            
+            match role {
+                ROLES::CONSUMER => distribution.coffee_lover_claim_reset(recipient),
+                ROLES::PRODUCER => distribution.producer_claim_reset(recipient),
+                ROLES::ROASTER => distribution.roaster_claim_reset(recipient),
+                ROLES::CAMBIATUS => distribution.cambiatus_claim_reset(),
+                ROLES::COFIBLOCKS => distribution.cofiblocks_claim_reset(),
+                ROLES::COFOUNDER => distribution.cofounder_claim_reset(recipient),
+            }
         }
 
-        fn claim_payment(ref self: ContractState) {
+        fn withdraw(ref self: ContractState, amount: u256, recipient: ContractAddress) {
+            self.accesscontrol.assert_only_role(DEFAULT_ADMIN_ROLE);
+            self.withdraw_usdc(amount, recipient);
+        }
+
+        fn withdraw_seller_balance(ref self: ContractState) {
             // Producers/roasters should call this function to receive their payment
             let balance = self.seller_claim_balances.read(get_caller_address());
-            self.claim_balance(balance, get_caller_address());
+            self.withdraw_usdc(balance, get_caller_address());
             self.seller_claim_balances.write(get_caller_address(), 0);
         }
 
-        fn get_claim_payment(self: @ContractState, wallet_address: ContractAddress) -> u256 {
+        fn get_seller_balance(self: @ContractState, wallet_address: ContractAddress) -> u256 {
             // Producers/roasters can read their claim payment from here
             self.seller_claim_balances.read(wallet_address)
         }
 
-        fn get_current_stock(self: @ContractState, token_id: u256) -> u256 {
-            let listed_product = self.listed_products.read(token_id);
-            assert(listed_product.is_available, 'Product not available');
-            listed_product.stock
+        fn get_tokens_by_holder(self: @ContractState, wallet_address: ContractAddress) -> Array<u256> {
+            let len_tokens = self.token_holders.entry(wallet_address).len();
+            let mut user_tokens = array![];
+
+            for index in 0..len_tokens {
+                user_tokens.append(self.token_holders.entry(wallet_address).at(index).read());
+            };
+
+            user_tokens
         }
     }
 
@@ -637,15 +423,64 @@ mod Marketplace {
 
     #[generate_trait]
     impl InternalImpl of InternalTrait {
-        fn claim_balance(ref self: ContractState, claim_balance: u256, recipient: ContractAddress) {
-            assert(claim_balance > 0, 'No tokens to claim');
+
+        fn mint_nfts(ref self: ContractState, token_id: u256, amount: u256) {
+            let cofi_collection = ICofiCollectionDispatcher {
+                contract_address: self.cofi_collection_address.read(),
+            };
+            cofi_collection.mint(get_contract_address(), token_id, amount, array![].span());
+        }
+
+        fn pay_for_product(ref self: ContractState, total_usdc: u256, buyer: ContractAddress) {
+            let usdc_dispatcher = IERC20Dispatcher { contract_address: self.usdc_address.read() };
+            let contract_address = get_contract_address();
+            assert(usdc_dispatcher.balance_of(buyer) >= total_usdc, 'insufficient funds');
+            assert(usdc_dispatcher.allowance(buyer, contract_address) >= total_usdc, 'insufficient allowance');
+            let success = usdc_dispatcher.transfer_from(buyer, contract_address, total_usdc);
+            assert(success, 'Error transferring tokens');
+        }
+
+        fn transfer_nfts(ref self: ContractState, receiver: ContractAddress, token_id: u256, amount: u256) {
+            let cofi_collection = ICofiCollectionDispatcher {
+                contract_address: self.cofi_collection_address.read(),
+            };
+            cofi_collection
+                .safe_transfer_from(
+                    get_contract_address(), receiver, token_id, amount, array![0].span(),
+                );
+
+            self.token_holders.entry(receiver).push(token_id);
+        }
+
+        fn assign_consumer_role(ref self: ContractState, consumer: ContractAddress) {
+            if (!self.accesscontrol.has_role(self.role_selector(ROLES::CONSUMER), consumer)) {
+                self.accesscontrol._grant_role(self.role_selector(ROLES::CONSUMER), consumer);
+            }
+        }
+
+        fn register_buy_for_distribution(
+            ref self: ContractState, listed_product: @ListedProduct, buyer: ContractAddress, amount: u256
+        ) {
+            let distribution = self.distribution.read();
+            let profit = (*(listed_product.price_usdc_with_fee) - *(listed_product.price_usdc)) * amount;
+            let producer_fee = *(listed_product.price_usdc) * amount;
+            let seller = *(listed_product.owner);
+            let is_producer = *(listed_product.is_producer);
+            let associated_producer = *(listed_product.associated_producer);
+            distribution.register_purchase(
+                buyer, seller, is_producer, associated_producer, producer_fee, profit
+            );
+        }
+
+        fn withdraw_usdc(ref self: ContractState, amount: u256, recipient: ContractAddress) {
+            assert(amount > 0, 'No tokens to claim');
 
             let usdc_token_dispatcher = IERC20Dispatcher {
                 contract_address: self.usdc_address.read(),
             };
             let marketplace_balance = usdc_token_dispatcher.balance_of(get_contract_address());
-            assert(claim_balance <= marketplace_balance, 'Contract insufficient balance');
-            let transfer = usdc_token_dispatcher.transfer(recipient, claim_balance);
+            assert(amount <= marketplace_balance, 'Contract insufficient balance');
+            let transfer = usdc_token_dispatcher.transfer(recipient, amount);
             assert(transfer, 'Error claiming');
         }
 
@@ -657,89 +492,6 @@ mod Marketplace {
         fn calculate_fee(self: @ContractState, amount: u256, bps: u256) -> u256 {
             assert((amount * bps) >= 10_000, 'Fee too low');
             amount * bps / 10_000
-        }
-
-        fn transfer_token(
-            ref self: ContractState, token_address: ContractAddress, amount: u256, buyer: ContractAddress
-        ) {
-            let token_dispatcher = IERC20Dispatcher { contract_address: token_address };
-            let contract_address = get_contract_address();
-            assert(
-                token_dispatcher.balance_of(buyer) >= amount, 'insufficient funds',
-            );
-            assert(
-                token_dispatcher.allowance(buyer, contract_address) >= amount,
-                'insufficient allowance',
-            );
-            let success = token_dispatcher.transfer_from(buyer, contract_address, amount);
-            assert(success, 'Error transferring tokens');
-        }
-
-        fn pay_with_token(ref self: ContractState, payment_token: PAYMENT_TOKEN, amount: u256, buyer: ContractAddress) {
-            if payment_token == PAYMENT_TOKEN::USDC {
-                let usdc_address = self.usdc_address.read();
-                self.transfer_token(usdc_address, amount, buyer);
-            } else {
-                let contract_address = if payment_token == PAYMENT_TOKEN::STRK {
-                    MainnetConfig::STRK_ADDRESS.try_into().unwrap()
-                } else {
-                    MainnetConfig::USDT_ADDRESS.try_into().unwrap()
-                };
-                self.transfer_token(contract_address, amount, buyer);
-                self.swap_token_for_usdc(contract_address, amount);
-            }
-        }
-
-        fn usdc_to_strk_wei(self: @ContractState, amount_usdc: u256) -> u256 {
-            let ekubo = self.ekubo.read();
-            let usdc_stark_pool_key = PoolKey {
-                token0: MainnetConfig::STRK_ADDRESS.try_into().unwrap(),
-                token1: self.usdc_address.read(),
-                fee: MainnetConfig::STARK_USDC_POOL_KEY,
-                tick_spacing: MainnetConfig::STARK_USDC_TICK_SPACING,
-                extension: 0x00.try_into().unwrap(),
-            };
-            let pool_price = ekubo.get_pool_price(usdc_stark_pool_key);
-
-            // To extract the price, formula is ((sqrt_ratio)/(2^128)) ^ 2.
-            // USDC has 6 decimals meanwhile STRK has 18 decimals. So padding is needed.
-            let price_without_pow = (pool_price.sqrt_ratio * ONE_E12) / TWO_E128;
-            let stark_price = price_without_pow * price_without_pow;
-
-            // The amount of starks expresed in 10^6 representation (6 decimals)
-            let starks_required = (amount_usdc * ONE_E12) / stark_price;
-            // output should be in 10^18 representation (wei) so padding with 12 zeros
-            starks_required * ONE_E12
-        }
-
-        fn compute_sqrt_ratio_limit(
-            ref self: ContractState,
-            sqrt_ratio: u256,
-            distance: u256,
-            is_token1: bool,
-            min: u256,
-            max: u256,
-        ) -> u256 {
-            let mut sqrt_ratio_limit = if is_token1 {
-                if (distance > max) {
-                    max
-                } else {
-                    sqrt_ratio + distance
-                }
-            } else {
-                if (distance > sqrt_ratio) {
-                    min
-                } else {
-                    sqrt_ratio - distance
-                }
-            };
-            if (sqrt_ratio_limit < min) {
-                sqrt_ratio_limit = min;
-            }
-            if (sqrt_ratio_limit > max) {
-                sqrt_ratio_limit = max;
-            }
-            sqrt_ratio_limit
         }
 
         fn role_selector(self: @ContractState, role: ROLES) -> felt252 {
@@ -758,49 +510,6 @@ mod Marketplace {
             let is_roaster = self.accesscontrol.has_role(self.role_selector(ROLES::ROASTER), caller);
             assert(is_producer || is_roaster, 'Caller is not a seller');
             is_producer
-        }
-
-        fn swap_token_for_usdc(
-            ref self: ContractState, sell_token_address: ContractAddress, sell_token_amount: u256,
-        ) {
-            let usdc_address = self.usdc_address.read();
-            let is_stark = sell_token_address == MainnetConfig::STRK_ADDRESS.try_into().unwrap();
-            let pool_key = if is_stark {
-                PoolKey {
-                    token0: sell_token_address,
-                    token1: usdc_address,
-                    fee: MainnetConfig::STARK_USDC_POOL_KEY,
-                    tick_spacing: MainnetConfig::STARK_USDC_TICK_SPACING,
-                    extension: 0x00.try_into().unwrap(),
-                }
-            } else {
-                PoolKey {
-                    token0: usdc_address,
-                    token1: sell_token_address,
-                    fee: MainnetConfig::USDT_USDC_POOL_KEY,
-                    tick_spacing: MainnetConfig::USDT_USDC_TICK_SPACING,
-                    extension: 0x00.try_into().unwrap(),
-                }
-            };
-
-            // This number was obteined through testing, its emprical
-            let sqrt_ratio_distance = 184467484371483390610000000000000000;
-            let callback = SwapAfterLockParameters {
-                contract_address: self.ekubo.read().contract_address,
-                to: get_contract_address(),
-                sell_token_address,
-                sell_token_amount,
-                buy_token_address: usdc_address,
-                pool_key,
-                sqrt_ratio_distance,
-            };
-
-            let mut data: Array<felt252> = ArrayTrait::new();
-            Serde::<SwapAfterLockParameters>::serialize(@callback, ref data);
-
-            // Lock
-            let ekubo = self.ekubo.read();
-            ekubo.lock(data.span());
         }
     }
 }
