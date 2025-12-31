@@ -782,24 +782,6 @@ const deployedContracts = {
           ],
         },
         {
-          type: "enum",
-          name: "contracts::marketplace::PAYMENT_TOKEN",
-          variants: [
-            {
-              name: "STRK",
-              type: "()",
-            },
-            {
-              name: "USDC",
-              type: "()",
-            },
-            {
-              name: "USDT",
-              type: "()",
-            },
-          ],
-        },
-        {
           type: "struct",
           name: "contracts::marketplace::ListedProduct",
           members: [
@@ -913,10 +895,6 @@ const deployedContracts = {
                   name: "token_amount",
                   type: "core::integer::u256",
                 },
-                {
-                  name: "payment_token",
-                  type: "contracts::marketplace::PAYMENT_TOKEN",
-                },
               ],
               outputs: [],
               state_mutability: "external",
@@ -967,30 +945,6 @@ const deployedContracts = {
             },
             {
               type: "function",
-              name: "get_product_price",
-              inputs: [
-                {
-                  name: "token_id",
-                  type: "core::integer::u256",
-                },
-                {
-                  name: "token_amount",
-                  type: "core::integer::u256",
-                },
-                {
-                  name: "payment_token",
-                  type: "contracts::marketplace::PAYMENT_TOKEN",
-                },
-              ],
-              outputs: [
-                {
-                  type: "core::integer::u256",
-                },
-              ],
-              state_mutability: "view",
-            },
-            {
-              type: "function",
               name: "get_product",
               inputs: [
                 {
@@ -1019,64 +973,14 @@ const deployedContracts = {
             },
             {
               type: "function",
-              name: "claim_consumer",
-              inputs: [],
-              outputs: [],
-              state_mutability: "external",
-            },
-            {
-              type: "function",
-              name: "claim_producer",
-              inputs: [],
-              outputs: [],
-              state_mutability: "external",
-            },
-            {
-              type: "function",
-              name: "claim_roaster",
-              inputs: [],
-              outputs: [],
-              state_mutability: "external",
-            },
-            {
-              type: "function",
-              name: "claim_cambiatus",
-              inputs: [],
-              outputs: [],
-              state_mutability: "external",
-            },
-            {
-              type: "function",
-              name: "claim_cofiblocks",
-              inputs: [],
-              outputs: [],
-              state_mutability: "external",
-            },
-            {
-              type: "function",
-              name: "claim_cofounder",
-              inputs: [],
-              outputs: [],
-              state_mutability: "external",
-            },
-            {
-              type: "function",
-              name: "locked",
+              name: "withdraw_distribution_balance",
               inputs: [
                 {
-                  name: "id",
-                  type: "core::integer::u32",
-                },
-                {
-                  name: "data",
-                  type: "core::array::Array::<core::felt252>",
+                  name: "role",
+                  type: "contracts::marketplace::ROLES",
                 },
               ],
-              outputs: [
-                {
-                  type: "core::array::Array::<core::felt252>",
-                },
-              ],
+              outputs: [],
               state_mutability: "external",
             },
             {
@@ -1084,8 +988,12 @@ const deployedContracts = {
               name: "withdraw",
               inputs: [
                 {
-                  name: "token",
-                  type: "contracts::marketplace::PAYMENT_TOKEN",
+                  name: "amount",
+                  type: "core::integer::u256",
+                },
+                {
+                  name: "recipient",
+                  type: "core::starknet::contract_address::ContractAddress",
                 },
               ],
               outputs: [],
@@ -1093,14 +1001,14 @@ const deployedContracts = {
             },
             {
               type: "function",
-              name: "claim_payment",
+              name: "withdraw_seller_balance",
               inputs: [],
               outputs: [],
               state_mutability: "external",
             },
             {
               type: "function",
-              name: "get_claim_payment",
+              name: "get_seller_balance",
               inputs: [
                 {
                   name: "wallet_address",
@@ -1116,16 +1024,16 @@ const deployedContracts = {
             },
             {
               type: "function",
-              name: "get_current_stock",
+              name: "get_tokens_by_holder",
               inputs: [
                 {
-                  name: "token_id",
-                  type: "core::integer::u256",
+                  name: "wallet_address",
+                  type: "core::starknet::contract_address::ContractAddress",
                 },
               ],
               outputs: [
                 {
-                  type: "core::integer::u256",
+                  type: "core::array::Array::<core::integer::u256>",
                 },
               ],
               state_mutability: "view",
@@ -1781,7 +1689,502 @@ const deployedContracts = {
         },
       ],
       classHash:
-        "0x710db5a8587d7399f02e8ba7da3565d307cea447e4a255189e5ba9930d76acb",
+        "0x371eefac831ab6d185c8e23b4add72f3dd98756fa669bd698a535c8793b4b3c",
+    },
+    Swap: {
+      address:
+        "0x73f9f0753bbbe0c646189662fbcad418dc42222658e982d206e49a5765cd7f8",
+      abi: [
+        {
+          type: "impl",
+          name: "SwapImpl",
+          interface_name: "contracts::swap::ISwap",
+        },
+        {
+          type: "enum",
+          name: "contracts::swap::SWAP_TOKEN",
+          variants: [
+            {
+              name: "STRK",
+              type: "()",
+            },
+            {
+              name: "USDC_BRIDGED",
+              type: "()",
+            },
+            {
+              name: "USDT",
+              type: "()",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "core::integer::u256",
+          members: [
+            {
+              name: "low",
+              type: "core::integer::u128",
+            },
+            {
+              name: "high",
+              type: "core::integer::u128",
+            },
+          ],
+        },
+        {
+          type: "interface",
+          name: "contracts::swap::ISwap",
+          items: [
+            {
+              type: "function",
+              name: "locked",
+              inputs: [
+                {
+                  name: "id",
+                  type: "core::integer::u32",
+                },
+                {
+                  name: "data",
+                  type: "core::array::Array::<core::felt252>",
+                },
+              ],
+              outputs: [
+                {
+                  type: "core::array::Array::<core::felt252>",
+                },
+              ],
+              state_mutability: "external",
+            },
+            {
+              type: "function",
+              name: "withdraw",
+              inputs: [
+                {
+                  name: "token",
+                  type: "contracts::swap::SWAP_TOKEN",
+                },
+              ],
+              outputs: [],
+              state_mutability: "external",
+            },
+            {
+              type: "function",
+              name: "swap_token_for_usdc",
+              inputs: [
+                {
+                  name: "token",
+                  type: "contracts::swap::SWAP_TOKEN",
+                },
+                {
+                  name: "amountUSDC",
+                  type: "core::integer::u256",
+                },
+              ],
+              outputs: [],
+              state_mutability: "external",
+            },
+            {
+              type: "function",
+              name: "swap_token_for_any_usdc",
+              inputs: [
+                {
+                  name: "token",
+                  type: "contracts::swap::SWAP_TOKEN",
+                },
+                {
+                  name: "token_amount",
+                  type: "core::integer::u256",
+                },
+              ],
+              outputs: [],
+              state_mutability: "external",
+            },
+            {
+              type: "function",
+              name: "get_swap_price",
+              inputs: [
+                {
+                  name: "token",
+                  type: "contracts::swap::SWAP_TOKEN",
+                },
+                {
+                  name: "amountUSDC",
+                  type: "core::integer::u256",
+                },
+              ],
+              outputs: [
+                {
+                  type: "core::integer::u256",
+                },
+              ],
+              state_mutability: "view",
+            },
+            {
+              type: "function",
+              name: "get_pending_claim",
+              inputs: [],
+              outputs: [
+                {
+                  type: "core::integer::u256",
+                },
+              ],
+              state_mutability: "view",
+            },
+            {
+              type: "function",
+              name: "claim_usdc",
+              inputs: [],
+              outputs: [],
+              state_mutability: "external",
+            },
+          ],
+        },
+        {
+          type: "impl",
+          name: "UpgradeableImpl",
+          interface_name: "openzeppelin_interfaces::upgrades::IUpgradeable",
+        },
+        {
+          type: "interface",
+          name: "openzeppelin_interfaces::upgrades::IUpgradeable",
+          items: [
+            {
+              type: "function",
+              name: "upgrade",
+              inputs: [
+                {
+                  name: "new_class_hash",
+                  type: "core::starknet::class_hash::ClassHash",
+                },
+              ],
+              outputs: [],
+              state_mutability: "external",
+            },
+          ],
+        },
+        {
+          type: "impl",
+          name: "SRC5Impl",
+          interface_name: "openzeppelin_interfaces::introspection::ISRC5",
+        },
+        {
+          type: "enum",
+          name: "core::bool",
+          variants: [
+            {
+              name: "False",
+              type: "()",
+            },
+            {
+              name: "True",
+              type: "()",
+            },
+          ],
+        },
+        {
+          type: "interface",
+          name: "openzeppelin_interfaces::introspection::ISRC5",
+          items: [
+            {
+              type: "function",
+              name: "supports_interface",
+              inputs: [
+                {
+                  name: "interface_id",
+                  type: "core::felt252",
+                },
+              ],
+              outputs: [
+                {
+                  type: "core::bool",
+                },
+              ],
+              state_mutability: "view",
+            },
+          ],
+        },
+        {
+          type: "impl",
+          name: "AccessControlImpl",
+          interface_name:
+            "openzeppelin_interfaces::access::accesscontrol::IAccessControl",
+        },
+        {
+          type: "interface",
+          name: "openzeppelin_interfaces::access::accesscontrol::IAccessControl",
+          items: [
+            {
+              type: "function",
+              name: "has_role",
+              inputs: [
+                {
+                  name: "role",
+                  type: "core::felt252",
+                },
+                {
+                  name: "account",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              outputs: [
+                {
+                  type: "core::bool",
+                },
+              ],
+              state_mutability: "view",
+            },
+            {
+              type: "function",
+              name: "get_role_admin",
+              inputs: [
+                {
+                  name: "role",
+                  type: "core::felt252",
+                },
+              ],
+              outputs: [
+                {
+                  type: "core::felt252",
+                },
+              ],
+              state_mutability: "view",
+            },
+            {
+              type: "function",
+              name: "grant_role",
+              inputs: [
+                {
+                  name: "role",
+                  type: "core::felt252",
+                },
+                {
+                  name: "account",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              outputs: [],
+              state_mutability: "external",
+            },
+            {
+              type: "function",
+              name: "revoke_role",
+              inputs: [
+                {
+                  name: "role",
+                  type: "core::felt252",
+                },
+                {
+                  name: "account",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              outputs: [],
+              state_mutability: "external",
+            },
+            {
+              type: "function",
+              name: "renounce_role",
+              inputs: [
+                {
+                  name: "role",
+                  type: "core::felt252",
+                },
+                {
+                  name: "account",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              outputs: [],
+              state_mutability: "external",
+            },
+          ],
+        },
+        {
+          type: "constructor",
+          name: "constructor",
+          inputs: [
+            {
+              name: "admin",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+          ],
+        },
+        {
+          type: "event",
+          name: "openzeppelin_introspection::src5::SRC5Component::Event",
+          kind: "enum",
+          variants: [],
+        },
+        {
+          type: "event",
+          name: "openzeppelin_access::accesscontrol::accesscontrol::AccessControlComponent::RoleGranted",
+          kind: "struct",
+          members: [
+            {
+              name: "role",
+              type: "core::felt252",
+              kind: "data",
+            },
+            {
+              name: "account",
+              type: "core::starknet::contract_address::ContractAddress",
+              kind: "data",
+            },
+            {
+              name: "sender",
+              type: "core::starknet::contract_address::ContractAddress",
+              kind: "data",
+            },
+          ],
+        },
+        {
+          type: "event",
+          name: "openzeppelin_access::accesscontrol::accesscontrol::AccessControlComponent::RoleGrantedWithDelay",
+          kind: "struct",
+          members: [
+            {
+              name: "role",
+              type: "core::felt252",
+              kind: "data",
+            },
+            {
+              name: "account",
+              type: "core::starknet::contract_address::ContractAddress",
+              kind: "data",
+            },
+            {
+              name: "sender",
+              type: "core::starknet::contract_address::ContractAddress",
+              kind: "data",
+            },
+            {
+              name: "delay",
+              type: "core::integer::u64",
+              kind: "data",
+            },
+          ],
+        },
+        {
+          type: "event",
+          name: "openzeppelin_access::accesscontrol::accesscontrol::AccessControlComponent::RoleRevoked",
+          kind: "struct",
+          members: [
+            {
+              name: "role",
+              type: "core::felt252",
+              kind: "data",
+            },
+            {
+              name: "account",
+              type: "core::starknet::contract_address::ContractAddress",
+              kind: "data",
+            },
+            {
+              name: "sender",
+              type: "core::starknet::contract_address::ContractAddress",
+              kind: "data",
+            },
+          ],
+        },
+        {
+          type: "event",
+          name: "openzeppelin_access::accesscontrol::accesscontrol::AccessControlComponent::RoleAdminChanged",
+          kind: "struct",
+          members: [
+            {
+              name: "role",
+              type: "core::felt252",
+              kind: "data",
+            },
+            {
+              name: "previous_admin_role",
+              type: "core::felt252",
+              kind: "data",
+            },
+            {
+              name: "new_admin_role",
+              type: "core::felt252",
+              kind: "data",
+            },
+          ],
+        },
+        {
+          type: "event",
+          name: "openzeppelin_access::accesscontrol::accesscontrol::AccessControlComponent::Event",
+          kind: "enum",
+          variants: [
+            {
+              name: "RoleGranted",
+              type: "openzeppelin_access::accesscontrol::accesscontrol::AccessControlComponent::RoleGranted",
+              kind: "nested",
+            },
+            {
+              name: "RoleGrantedWithDelay",
+              type: "openzeppelin_access::accesscontrol::accesscontrol::AccessControlComponent::RoleGrantedWithDelay",
+              kind: "nested",
+            },
+            {
+              name: "RoleRevoked",
+              type: "openzeppelin_access::accesscontrol::accesscontrol::AccessControlComponent::RoleRevoked",
+              kind: "nested",
+            },
+            {
+              name: "RoleAdminChanged",
+              type: "openzeppelin_access::accesscontrol::accesscontrol::AccessControlComponent::RoleAdminChanged",
+              kind: "nested",
+            },
+          ],
+        },
+        {
+          type: "event",
+          name: "openzeppelin_upgrades::upgradeable::UpgradeableComponent::Upgraded",
+          kind: "struct",
+          members: [
+            {
+              name: "class_hash",
+              type: "core::starknet::class_hash::ClassHash",
+              kind: "data",
+            },
+          ],
+        },
+        {
+          type: "event",
+          name: "openzeppelin_upgrades::upgradeable::UpgradeableComponent::Event",
+          kind: "enum",
+          variants: [
+            {
+              name: "Upgraded",
+              type: "openzeppelin_upgrades::upgradeable::UpgradeableComponent::Upgraded",
+              kind: "nested",
+            },
+          ],
+        },
+        {
+          type: "event",
+          name: "contracts::swap::Swap::Event",
+          kind: "enum",
+          variants: [
+            {
+              name: "SRC5Event",
+              type: "openzeppelin_introspection::src5::SRC5Component::Event",
+              kind: "flat",
+            },
+            {
+              name: "AccessControlEvent",
+              type: "openzeppelin_access::accesscontrol::accesscontrol::AccessControlComponent::Event",
+              kind: "flat",
+            },
+            {
+              name: "UpgradeableEvent",
+              type: "openzeppelin_upgrades::upgradeable::UpgradeableComponent::Event",
+              kind: "flat",
+            },
+          ],
+        },
+      ],
+      classHash:
+        "0x7f247a1df2cd4c805579bab0b01c3510919e28bbb80df8a740e7fff904eb77f",
     },
   },
   sepolia: {
@@ -2562,24 +2965,6 @@ const deployedContracts = {
           ],
         },
         {
-          type: "enum",
-          name: "contracts::marketplace::PAYMENT_TOKEN",
-          variants: [
-            {
-              name: "STRK",
-              type: "()",
-            },
-            {
-              name: "USDC",
-              type: "()",
-            },
-            {
-              name: "USDT",
-              type: "()",
-            },
-          ],
-        },
-        {
           type: "struct",
           name: "contracts::marketplace::ListedProduct",
           members: [
@@ -2693,10 +3078,6 @@ const deployedContracts = {
                   name: "token_amount",
                   type: "core::integer::u256",
                 },
-                {
-                  name: "payment_token",
-                  type: "contracts::marketplace::PAYMENT_TOKEN",
-                },
               ],
               outputs: [],
               state_mutability: "external",
@@ -2747,30 +3128,6 @@ const deployedContracts = {
             },
             {
               type: "function",
-              name: "get_product_price",
-              inputs: [
-                {
-                  name: "token_id",
-                  type: "core::integer::u256",
-                },
-                {
-                  name: "token_amount",
-                  type: "core::integer::u256",
-                },
-                {
-                  name: "payment_token",
-                  type: "contracts::marketplace::PAYMENT_TOKEN",
-                },
-              ],
-              outputs: [
-                {
-                  type: "core::integer::u256",
-                },
-              ],
-              state_mutability: "view",
-            },
-            {
-              type: "function",
               name: "get_product",
               inputs: [
                 {
@@ -2799,64 +3156,14 @@ const deployedContracts = {
             },
             {
               type: "function",
-              name: "claim_consumer",
-              inputs: [],
-              outputs: [],
-              state_mutability: "external",
-            },
-            {
-              type: "function",
-              name: "claim_producer",
-              inputs: [],
-              outputs: [],
-              state_mutability: "external",
-            },
-            {
-              type: "function",
-              name: "claim_roaster",
-              inputs: [],
-              outputs: [],
-              state_mutability: "external",
-            },
-            {
-              type: "function",
-              name: "claim_cambiatus",
-              inputs: [],
-              outputs: [],
-              state_mutability: "external",
-            },
-            {
-              type: "function",
-              name: "claim_cofiblocks",
-              inputs: [],
-              outputs: [],
-              state_mutability: "external",
-            },
-            {
-              type: "function",
-              name: "claim_cofounder",
-              inputs: [],
-              outputs: [],
-              state_mutability: "external",
-            },
-            {
-              type: "function",
-              name: "locked",
+              name: "withdraw_distribution_balance",
               inputs: [
                 {
-                  name: "id",
-                  type: "core::integer::u32",
-                },
-                {
-                  name: "data",
-                  type: "core::array::Array::<core::felt252>",
+                  name: "role",
+                  type: "contracts::marketplace::ROLES",
                 },
               ],
-              outputs: [
-                {
-                  type: "core::array::Array::<core::felt252>",
-                },
-              ],
+              outputs: [],
               state_mutability: "external",
             },
             {
@@ -2864,8 +3171,12 @@ const deployedContracts = {
               name: "withdraw",
               inputs: [
                 {
-                  name: "token",
-                  type: "contracts::marketplace::PAYMENT_TOKEN",
+                  name: "amount",
+                  type: "core::integer::u256",
+                },
+                {
+                  name: "recipient",
+                  type: "core::starknet::contract_address::ContractAddress",
                 },
               ],
               outputs: [],
@@ -2873,14 +3184,14 @@ const deployedContracts = {
             },
             {
               type: "function",
-              name: "claim_payment",
+              name: "withdraw_seller_balance",
               inputs: [],
               outputs: [],
               state_mutability: "external",
             },
             {
               type: "function",
-              name: "get_claim_payment",
+              name: "get_seller_balance",
               inputs: [
                 {
                   name: "wallet_address",
@@ -2896,16 +3207,16 @@ const deployedContracts = {
             },
             {
               type: "function",
-              name: "get_current_stock",
+              name: "get_tokens_by_holder",
               inputs: [
                 {
-                  name: "token_id",
-                  type: "core::integer::u256",
+                  name: "wallet_address",
+                  type: "core::starknet::contract_address::ContractAddress",
                 },
               ],
               outputs: [
                 {
-                  type: "core::integer::u256",
+                  type: "core::array::Array::<core::integer::u256>",
                 },
               ],
               state_mutability: "view",
@@ -3561,7 +3872,7 @@ const deployedContracts = {
         },
       ],
       classHash:
-        "0x710db5a8587d7399f02e8ba7da3565d307cea447e4a255189e5ba9930d76acb",
+        "0x371eefac831ab6d185c8e23b4add72f3dd98756fa669bd698a535c8793b4b3c",
     },
   },
 } as const;

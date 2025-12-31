@@ -127,6 +127,7 @@ mod Swap {
         #[substorage(v0)]
         upgradeable: UpgradeableComponent::Storage,
         transferrable_usdc_amounts: Map<ContractAddress, u256>,
+        promised_usdc_amounts: Map<ContractAddress, u256>,
         ekubo: ICoreDispatcher,
         usdc_receiver: ContractAddress,
     }
@@ -222,7 +223,13 @@ mod Swap {
 
             let receiver = self.usdc_receiver.read();
             let current_amount = self.transferrable_usdc_amounts.read(receiver);
-            let new_amount = current_amount + buy_amount.mag.try_into().unwrap_or(0);
+            let mut new_amount = current_amount + buy_amount.mag.try_into().unwrap_or(0);
+            
+            let promised_usdc_amount = self.promised_usdc_amounts.read(receiver);
+            if (promised_usdc_amount > 0) {
+                new_amount = current_amount + promised_usdc_amount;
+                self.promised_usdc_amounts.write(receiver, 0);
+            }
             self.transferrable_usdc_amounts.write(receiver, new_amount);
             self.usdc_receiver.write('0x0'.try_into().unwrap());
 
@@ -256,6 +263,11 @@ mod Swap {
             let amount_to_transfer = self._get_swap_price(token, amountUSDC);
             self.transfer_tokens_to_contract(token_address, amount_to_transfer, get_caller_address());
             self.usdc_receiver.write(get_caller_address());
+
+            // Sponsoring swaps under $50, we promise the user to withdraw 1:1
+            if (token == SWAP_TOKEN::USDC_BRIDGED && amountUSDC < 50_000_000) {
+                self.promised_usdc_amounts.write(get_caller_address(), amount_to_transfer)
+            }
             self._swap_token_for_usdc(token, amount_to_transfer);
         }
 
@@ -268,6 +280,11 @@ mod Swap {
             };
             self.transfer_tokens_to_contract(token_address, token_amount, get_caller_address());
             self.usdc_receiver.write(get_caller_address());
+
+            // Sponsoring swaps under $50, we promise the user to withdraw 1:1
+            if (token == SWAP_TOKEN::USDC_BRIDGED && token_amount < 50_000_000) {
+                self.promised_usdc_amounts.write(get_caller_address(), token_amount)
+            }
             self._swap_token_for_usdc(token, token_amount);
         }
 
@@ -327,7 +344,11 @@ mod Swap {
                 SWAP_TOKEN::STRK => self.usdc_to_strk_wei(amountUSDC),
                 SWAP_TOKEN::USDT => self.usdc_to_usdt(amountUSDC),
                 SWAP_TOKEN::USDC_BRIDGED => {
-                    let slippage = amountUSDC * MainnetConfig::USDC_BRIDGED_SLIPPAGE_PERCENTAGE / 100;
+                    // We sponsor fees for usdc.e to usdc swaps for up to $50 
+                    let mut slippage = 0;
+                    if (amountUSDC > 50_000_000) {
+                        slippage = amountUSDC * MainnetConfig::USDC_BRIDGED_SLIPPAGE_PERCENTAGE / 100;
+                    }
                     amountUSDC + slippage
                 }
             };

@@ -86,10 +86,10 @@ const upgradeMode = async () => {
 	const marketplace = deployments["Marketplace"];
 	const swap = deployments["Swap"];
 
-	if (!distribution || !marketplace) {
+	if (!distribution || !marketplace || !swap) {
 		console.error(
 			red(
-				"❌ Cannot upgrade — missing Distribution or Marketplace in deployments/<network>_latest.json"
+				"❌ Cannot upgrade — missing Distribution or Marketplace or Swap in deployments/<network>_latest.json"
 			)
 		);
 		process.exit(1);
