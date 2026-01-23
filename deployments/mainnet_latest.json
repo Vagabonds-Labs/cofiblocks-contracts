@@ -7,11 +7,6 @@
   "Marketplace": {
     "contract": "Marketplace",
     "address": "0x5900f2291dfd06c239dc74bf0f21719f3001ff841856daa2351112671ed5188",
-    "classHash": "0x371eefac831ab6d185c8e23b4add72f3dd98756fa669bd698a535c8793b4b3c"
-  },
-  "Swap": {
-    "contract": "Swap",
-    "address": "0x73f9f0753bbbe0c646189662fbcad418dc42222658e982d206e49a5765cd7f8",
-    "classHash": "0x7f247a1df2cd4c805579bab0b01c3510919e28bbb80df8a740e7fff904eb77f"
+    "classHash": "0x6d121c9ecf926b57ebbe35799d4c8a41015e43bc955d112c931fb0c13238d5d"
   }
 }

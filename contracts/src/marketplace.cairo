@@ -33,7 +33,7 @@ pub trait IMarketplace<ContractState> {
     fn assign_role(ref self: ContractState, role: ROLES, assignee: ContractAddress);
     fn account_has_role(self: @ContractState, role: ROLES, account: ContractAddress) -> bool;
     fn account_revoke_role(ref self: ContractState, role: ROLES, revokee: ContractAddress);
-    fn buy_product(ref self: ContractState, token_id: u256, token_amount: u256);
+    fn buy_product(ref self: ContractState, token_id: u256, token_amount: u256, buyer: ContractAddress);
     fn create_product(
         ref self: ContractState, 
         initial_stock: u256, 
@@ -245,8 +245,7 @@ mod Marketplace {
             self.listed_products.read(token_id)
         }
 
-        fn buy_product(ref self: ContractState, token_id: u256, token_amount: u256) {
-            let buyer = get_caller_address();
+        fn buy_product(ref self: ContractState, token_id: u256, token_amount: u256, buyer: ContractAddress) {
             let mut listed_product = self.listed_products.read(token_id);
             let stock = listed_product.stock;
             assert(stock >= token_amount, 'Not enough stock');
@@ -254,7 +253,8 @@ mod Marketplace {
 
             let mut producer_fee = listed_product.price_usdc * token_amount;
             let mut total_usdc = listed_product.price_usdc_with_fee * token_amount;
-            self.pay_for_product(total_usdc, buyer);
+            // Buyer and payer can be different (e.g. using stripe)
+            self.pay_for_product(total_usdc, get_caller_address());
             self.emit(BuyProduct { token_id, amount: token_amount, buyer: buyer });
 
             // Transfer the nft products

@@ -84,9 +84,8 @@ const upgradeMode = async () => {
 
 	const distribution = deployments["Distribution"];
 	const marketplace = deployments["Marketplace"];
-	const swap = deployments["Swap"];
 
-	if (!distribution || !marketplace || !swap) {
+	if (!distribution || !marketplace) {
 		console.error(
 			red(
 				"❌ Cannot upgrade — missing Distribution or Marketplace or Swap in deployments/<network>_latest.json"
@@ -97,7 +96,6 @@ const upgradeMode = async () => {
 
 	await upgradeOne("Distribution", distribution.address);
 	await upgradeOne("Marketplace", marketplace.address);
-	await upgradeOne("Swap", swap.address);
 
 	exportDeployments();
 	console.log(green("✔ All upgrades completed"));
